@@ -2,6 +2,6 @@
 
 Garage133 is a DIY device for garage door automation.
 
-Please see the blog [post](https://selectiveappeal.org/posts/garage133/) about this project.
+This repository is under construction -- better documentation to come!
 
-This repository is under construction -- bBetter documentation to come!
+For now, please see the [blog post](https://selectiveappeal.org/posts/garage133/) about this project.
