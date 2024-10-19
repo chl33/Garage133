@@ -11,3 +11,4 @@ secrets*.yaml
 *.old
 /scad/*/*.3mf
 /KiCAD/*-backups/
+/KiCAD/Gerber/
