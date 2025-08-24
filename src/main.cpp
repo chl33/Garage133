@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cstring>
 
-#define VERSION "0.8.0"
+#define VERSION "0.9.0"
 
 namespace og3 {
 
@@ -72,8 +72,8 @@ static const char kPirModule[] = "PIR";
 
 VariableGroup s_cvg("garage_cfg");
 VariableGroup s_vg("garage");
-VariableGroup s_lvg("left", VariableGroup::VarNameType::kWithGroup);
-VariableGroup s_rvg("right", VariableGroup::VarNameType::kWithGroup);
+VariableGroup s_lvg("left");
+VariableGroup s_rvg("right");
 
 Shtc3 s_shtc3(kTemperature, kHumidity, &s_app.module_system(), "temperature", s_vg);
 
@@ -84,8 +84,7 @@ Relay s_right_relay(kRelay, &s_app.tasks(), kRelayRightPin, "Right button", true
 
 Sonar s_left_sonar(kSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
 Sonar s_right_sonar(kSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
-Pir s_pir(kPirModule, kMotion, &s_app.module_system(), &s_app.tasks(), kPirPin, kMotion, s_vg, true,
-          true);
+Pir s_pir(kPirModule, kMotion, &s_app.module_system(), kPirPin, kMotion, s_vg, true, true);
 MappedAnalogSensor s_light_sensor(
     MappedAnalogSensor::Options{
         .name = kLight,
@@ -107,7 +106,7 @@ MappedAnalogSensor s_light_sensor(
     &s_app.module_system(), s_cvg, s_vg);
 
 // Global variable for html, so asyncwebserver can send data in the background (single client)
-String s_html;
+std::string s_html;
 
 // Delay between updates of the OLED.
 constexpr unsigned kOledSwitchMsec = 5000;
@@ -144,13 +143,24 @@ class Classifier : public Module {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
       auto* ha_discovery = m_dependencies.ha_discovery();
+
+      auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
+        char device_id[80];
+        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), this->m_door.name());
+        entry.device_name = this->m_door.name();
+        entry.device_id = device_id;
+        entry.via_device = had->deviceId();
+        return had->addEntry(json, entry);
+      };
+
       if (m_dependencies.mqtt_manager() && ha_discovery) {
-        ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_door, ha::device_type::kCover,
                                    ha::device_class::binary_sensor::kGarage);
-          String command = String(m_door.name()) + "/set";
+          std::string command = std::string(m_door.name()) + "/set";
           entry.command = command.c_str();
-          entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
+          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
+                                                    size_t len) {
             const bool on =
                 (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
                 (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
@@ -159,18 +169,19 @@ class Classifier : public Module {
               m_relay->turnOn(kRelayOnMsec);
             }
           };
-          return had->addEntry(json, entry);
+          return addEntry(entry, had, json);
         });
-        ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
                                    ha::device_class::binary_sensor::kPresence);
           entry.icon = "mdi:car";
-          return had->addEntry(json, entry);
+          return addEntry(entry, had, json);
         });
         if (m_light) {
-          m_dependencies.ha_discovery()->addDiscoveryCallback([this](HADiscovery* had,
-                                                                     JsonDocument* json) {
-            return had->addMeas(json, m_light->mapped_value(), ha::device_type::kSensor, nullptr);
+          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
+                                                                               JsonDocument* json) {
+            HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
+            return addEntry(entry, had, json);
           });
         }
       }
