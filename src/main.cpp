@@ -65,7 +65,8 @@ constexpr int kMqttUpdateMsec = kMsecInMin;
 static const char kTemperature[] = "temperature";
 static const char kHumidity[] = "humidity";
 static const char kRelay[] = "relay";
-static const char kSonar[] = "sonar";
+static const char kLeftSonar[] = "left_sonar";
+static const char kRightSonar[] = "right_sonar";
 static const char kMotion[] = "motion";
 static const char kLight[] = "light";
 static const char kPirModule[] = "PIR";
@@ -82,8 +83,8 @@ Relay s_left_relay(kRelay, &s_app.tasks(), kRelayLeftPin, "Left button", true, s
 Relay s_right_relay(kRelay, &s_app.tasks(), kRelayRightPin, "Right button", true, s_rvg,
                     Relay::OnLevel::kHigh);
 
-Sonar s_left_sonar(kSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
-Sonar s_right_sonar(kSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
+Sonar s_left_sonar(kLeftSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
+Sonar s_right_sonar(kRightSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
 Pir s_pir(kPirModule, kMotion, &s_app.module_system(), kPirPin, kMotion, s_vg, true, true);
 MappedAnalogSensor s_light_sensor(
     MappedAnalogSensor::Options{
@@ -106,7 +107,7 @@ MappedAnalogSensor s_light_sensor(
     &s_app.module_system(), s_cvg, s_vg);
 
 // Global variable for html, so asyncwebserver can send data in the background (single client)
-std::string s_html;
+String s_html;
 
 // Delay between updates of the OLED.
 constexpr unsigned kOledSwitchMsec = 5000;
@@ -138,6 +139,7 @@ class Classifier : public Module {
       : Module(door, &app->module_system()),
         m_relay(relay),
         m_light(light),
+        m_door_name(String(door) + "_door"),
         m_car("car", false, "car", vg),
         m_door("door", false, "door", vg) {
     setDependencies(&m_dependencies);
@@ -146,10 +148,13 @@ class Classifier : public Module {
 
       auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
         char device_id[80];
-        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), this->m_door.name());
-        entry.device_name = this->m_door.name();
+        char entry_name[128];
+        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), m_door_name.c_str());
+        snprintf(entry_name, sizeof(entry_name), "%s_%s", m_door_name.c_str(), entry.var.name());
+        entry.device_name = this->m_door_name.c_str();
         entry.device_id = device_id;
         entry.via_device = had->deviceId();
+        entry.entry_name = entry_name;
         return had->addEntry(json, entry);
       };
 
@@ -157,7 +162,7 @@ class Classifier : public Module {
         ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_door, ha::device_type::kCover,
                                    ha::device_class::binary_sensor::kGarage);
-          std::string command = std::string(m_door.name()) + "/set";
+          String command = String(m_door.name()) + "/set";
           entry.command = command.c_str();
           entry.command_callback = [this, addEntry](const char* topic, const char* payload,
                                                     size_t len) {
@@ -225,6 +230,7 @@ class Classifier : public Module {
   HADependencies m_dependencies;
   Relay* m_relay;
   MappedAnalogSensor* m_light;
+  String m_door_name;
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
   bool m_updated = false;
