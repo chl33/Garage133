@@ -12,3 +12,4 @@ secrets*.yaml
 /scad/*/*.3mf
 /KiCAD/*-backups/
 /KiCAD/Gerber/
+/local.ini

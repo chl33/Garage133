@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Chris Lee and contibuters.
+// Copyright (c) 2025 Chris Lee and contibuters.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 #include <Arduino.h>
@@ -18,11 +18,12 @@
 #include <og3/sonar.h>
 #include <og3/units.h>
 #include <og3/variable.h>
+#include <og3/wifi_watchdog.h>
 
 #include <algorithm>
 #include <cstring>
 
-#define VERSION "0.8.0"
+#define VERSION "0.9.5"
 
 namespace og3 {
 
@@ -65,15 +66,16 @@ constexpr int kMqttUpdateMsec = kMsecInMin;
 static const char kTemperature[] = "temperature";
 static const char kHumidity[] = "humidity";
 static const char kRelay[] = "relay";
-static const char kSonar[] = "sonar";
+static const char kLeftSonar[] = "left_sonar";
+static const char kRightSonar[] = "right_sonar";
 static const char kMotion[] = "motion";
 static const char kLight[] = "light";
 static const char kPirModule[] = "PIR";
 
 VariableGroup s_cvg("garage_cfg");
 VariableGroup s_vg("garage");
-VariableGroup s_lvg("left", VariableGroup::VarNameType::kWithGroup);
-VariableGroup s_rvg("right", VariableGroup::VarNameType::kWithGroup);
+VariableGroup s_lvg("left");
+VariableGroup s_rvg("right");
 
 Shtc3 s_shtc3(kTemperature, kHumidity, &s_app.module_system(), "temperature", s_vg);
 
@@ -82,10 +84,9 @@ Relay s_left_relay(kRelay, &s_app.tasks(), kRelayLeftPin, "Left button", true, s
 Relay s_right_relay(kRelay, &s_app.tasks(), kRelayRightPin, "Right button", true, s_rvg,
                     Relay::OnLevel::kHigh);
 
-Sonar s_left_sonar(kSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
-Sonar s_right_sonar(kSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
-Pir s_pir(kPirModule, kMotion, &s_app.module_system(), &s_app.tasks(), kPirPin, kMotion, s_vg, true,
-          true);
+Sonar s_left_sonar(kLeftSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
+Sonar s_right_sonar(kRightSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
+Pir s_pir(kPirModule, kMotion, &s_app.module_system(), kPirPin, kMotion, s_vg, true, true);
 MappedAnalogSensor s_light_sensor(
     MappedAnalogSensor::Options{
         .name = kLight,
@@ -139,18 +140,33 @@ class Classifier : public Module {
       : Module(door, &app->module_system()),
         m_relay(relay),
         m_light(light),
+        m_door_name(String(door) + "_door"),
         m_car("car", false, "car", vg),
         m_door("door", false, "door", vg) {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
       auto* ha_discovery = m_dependencies.ha_discovery();
+
+      auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
+        char device_id[80];
+        char entry_name[128];
+        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), m_door_name.c_str());
+        snprintf(entry_name, sizeof(entry_name), "%s_%s", m_door_name.c_str(), entry.var.name());
+        entry.device_name = this->m_door_name.c_str();
+        entry.device_id = device_id;
+        entry.via_device = had->deviceId();
+        entry.entry_name = entry_name;
+        return had->addEntry(json, entry);
+      };
+
       if (m_dependencies.mqtt_manager() && ha_discovery) {
-        ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_door, ha::device_type::kCover,
                                    ha::device_class::binary_sensor::kGarage);
           String command = String(m_door.name()) + "/set";
           entry.command = command.c_str();
-          entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
+          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
+                                                    size_t len) {
             const bool on =
                 (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
                 (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
@@ -159,18 +175,19 @@ class Classifier : public Module {
               m_relay->turnOn(kRelayOnMsec);
             }
           };
-          return had->addEntry(json, entry);
+          return addEntry(entry, had, json);
         });
-        ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
                                    ha::device_class::binary_sensor::kPresence);
           entry.icon = "mdi:car";
-          return had->addEntry(json, entry);
+          return addEntry(entry, had, json);
         });
         if (m_light) {
-          m_dependencies.ha_discovery()->addDiscoveryCallback([this](HADiscovery* had,
-                                                                     JsonDocument* json) {
-            return had->addMeas(json, m_light->mapped_value(), ha::device_type::kSensor, nullptr);
+          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
+                                                                               JsonDocument* json) {
+            HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
+            return addEntry(entry, had, json);
           });
         }
       }
@@ -214,6 +231,7 @@ class Classifier : public Module {
   HADependencies m_dependencies;
   Relay* m_relay;
   MappedAnalogSensor* m_light;
+  String m_door_name;
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
   bool m_updated = false;
@@ -301,6 +319,9 @@ void checkMotion() {
   }
   wasMotion = motion;
 }
+
+// Add a watchdog to reboot the device if it locks-up for some reason.
+og3::WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1));
 
 }  // namespace og3
 
