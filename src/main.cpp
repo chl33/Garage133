@@ -18,11 +18,12 @@
 #include <og3/sonar.h>
 #include <og3/units.h>
 #include <og3/variable.h>
+#include <og3/wifi_watchdog.h>
 
 #include <algorithm>
 #include <cstring>
 
-#define VERSION "0.9.0"
+#define VERSION "0.9.5"
 
 namespace og3 {
 
@@ -318,6 +319,9 @@ void checkMotion() {
   }
   wasMotion = motion;
 }
+
+// Add a watchdog to reboot the device if it locks-up for some reason.
+og3::WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1));
 
 }  // namespace og3
 
