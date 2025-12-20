@@ -162,7 +162,7 @@ class Classifier : public Module {
       if (m_dependencies.mqtt_manager() && ha_discovery) {
         ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_door, ha::device_type::kCover,
-                                   ha::device_class::binary_sensor::kGarage);
+                                   ha::device_class::binary_sensor::kGarageDoor);
           String command = String(m_door.name()) + "/set";
           entry.command = command.c_str();
           entry.command_callback = [this, addEntry](const char* topic, const char* payload,
