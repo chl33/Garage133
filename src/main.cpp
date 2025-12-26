@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <cstring>
 
-#define VERSION "0.9.5"
+#define VERSION "0.9.6"
 
 namespace og3 {
 
@@ -162,7 +162,7 @@ class Classifier : public Module {
       if (m_dependencies.mqtt_manager() && ha_discovery) {
         ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
           HADiscovery::Entry entry(m_door, ha::device_type::kCover,
-                                   ha::device_class::binary_sensor::kGarageDoor);
+                                   ha::device_class::cover::kGarage);
           String command = String(m_door.name()) + "/set";
           entry.command = command.c_str();
           entry.command_callback = [this, addEntry](const char* topic, const char* payload,
