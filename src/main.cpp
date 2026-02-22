@@ -254,7 +254,7 @@ void update() {
            s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
   og3::s_oled.display(text);
 
-  s_app.log().debug(text);
+  s_app.log().log(text);
 
   s_pir.read();
   s_light_sensor.read();
@@ -303,7 +303,7 @@ void handleWebRoot(AsyncWebServerRequest* request) {
 void onMotion() {
   s_app.mqttSend(s_vg);
   if (s_pir.motion()) {
-    s_app.log().debug("Motion1!");
+    s_app.log().log("Motion detecte!");
     s_oled.display("Motion");
   }
 }
