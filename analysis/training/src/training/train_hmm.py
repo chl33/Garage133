@@ -14,14 +14,16 @@ STATE_TO_IDX = {s: i for i, s in enumerate(STATES)}
 # Default distance boundaries in cm for discrete buckets:
 DEFAULT_BOUNDARIES = [70, 190, 350]
 
+
 def get_bucket(val, boundaries):
     """Maps a raw distance value into a discrete bucket index."""
     if pd.isna(val) or val < 0:
-        return len(boundaries) # Last bucket for error
+        return len(boundaries)  # Last bucket for error
     for i, b in enumerate(boundaries):
         if val < b:
             return i
-    return len(boundaries) # Last bucket for long distances/errors
+    return len(boundaries)  # Last bucket for long distances/errors
+
 
 def build_transition_matrix():
     """
@@ -49,37 +51,40 @@ def build_transition_matrix():
 
     return A
 
+
 def train_side_emissions(side, manifest, manifest_path, boundaries):
-    """Calculates emission probabilities for a specific side from labeled CSVs."""
+    """Calculates emission probabilities for a side from labeled CSVs."""
     num_states = len(STATES)
     num_buckets = len(boundaries) + 1
     counts = np.zeros((num_states, num_buckets))
-    
+
     manifest_dir = Path(manifest_path).parent
 
     for episode in manifest.get("episodes", []):
         file_name = episode.get("file")
         file_path = manifest_dir / file_name
-        
+
         if not file_path.exists():
             continue
 
         # Load CSV
         df = pd.read_csv(file_path)
-        df['time'] = pd.to_datetime(df['time'], format='ISO8601')
-        df.sort_values('time', inplace=True)
+        df["time"] = pd.to_datetime(df["time"], format="ISO8601")
+        df.sort_values("time", inplace=True)
 
         side_info = episode.get(side)
         if not side_info or not side_info.get("initial_state"):
             continue
 
         current_state = side_info["initial_state"]
-        transitions = sorted(side_info.get("transitions", []), key=lambda x: x["time"])
+        trans_list = side_info.get("transitions", [])
+        transitions = sorted(trans_list, key=lambda x: x["time"])
         trans_idx = 0
 
         for _, row in df.iterrows():
             if trans_idx < len(transitions):
-                trans_time = pd.to_datetime(transitions[trans_idx]["time"], format='ISO8601')
+                t_str = transitions[trans_idx]["time"]
+                trans_time = pd.to_datetime(t_str, format="ISO8601")
                 if row["time"] >= trans_time:
                     current_state = transitions[trans_idx]["to"]
                     trans_idx += 1
@@ -91,8 +96,10 @@ def train_side_emissions(side, manifest, manifest_path, boundaries):
                 counts[STATE_TO_IDX[current_state]][bucket] += 1
 
     # Normalize to probabilities (with Laplace smoothing)
-    emissions = (counts + 0.1) / (counts.sum(axis=1, keepdims=True) + 0.1 * num_buckets)
+    denom = counts.sum(axis=1, keepdims=True) + 0.1 * num_buckets
+    emissions = (counts + 0.1) / denom
     return emissions
+
 
 def save_model(side, A, B, pi, boundaries, output_dir):
     model = {
@@ -101,49 +108,77 @@ def save_model(side, A, B, pi, boundaries, output_dir):
         "boundaries": boundaries,
         "pi": pi.tolist(),
         "A": A.tolist(),
-        "B": B.tolist()
+        "B": B.tolist(),
     }
     output_path = Path(output_dir) / f"hmm_{side}.json"
-    with output_path.open('w') as f:
+    with output_path.open("w") as f:
         json.dump(model, f, indent=2)
     print(f"Saved {side} model to {output_path}")
+
 
 def export_to_cpp(A, B, pi, boundaries, output_path):
     """Exports the HMM parameters to a C++ header file for ESP32."""
     output_path = Path(output_path)
-    with output_path.open('w') as f:
+    with output_path.open("w") as f:
         f.write("#ifndef HMM_CONFIG_H\n#define HMM_CONFIG_H\n\n")
         f.write(f"// Generated on {datetime.now().isoformat()}\n\n")
         f.write(f"const int HMM_NUM_STATES = {len(STATES)};\n")
         f.write(f"const int HMM_NUM_BUCKETS = {len(boundaries) + 1};\n\n")
-        f.write("const float HMM_BOUNDARIES[] = {" + ", ".join(map(str, boundaries)) + "};\n\n")
-        f.write("const float HMM_PI[] = {" + ", ".join(map(str, pi)) + "};\n\n")
+        b_str = ", ".join(map(str, boundaries))
+        f.write(f"const float HMM_BOUNDARIES[] = {{{b_str}}};\n\n")
+        pi_str = ", ".join(map(str, pi))
+        f.write(f"const float HMM_PI[] = {{{pi_str}}};\n\n")
         f.write("const float HMM_A[HMM_NUM_STATES][HMM_NUM_STATES] = {\n")
         for row in A:
-            f.write("    {" + ", ".join(f"{x:.6f}f" for x in row) + "},\n")
+            r_str = ", ".join(f"{x:.6f}f" for x in row)
+            f.write(f"    {{{r_str}}},\n")
         f.write("};\n\n")
         f.write("const float HMM_B[HMM_NUM_STATES][HMM_NUM_BUCKETS] = {\n")
         for row in B:
-            f.write("    {" + ", ".join(f"{x:.6f}f" for x in row) + "},\n")
+            r_str = ", ".join(f"{x:.6f}f" for x in row)
+            f.write(f"    {{{r_str}}},\n")
         f.write("};\n\n")
         f.write("#endif // HMM_CONFIG_H\n")
     print(f"Exported C++ header: {output_path}")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train separate HMMs for Garage133 sides.")
-    parser.add_argument("--manifest", type=str, default="manifest.yaml", help="Path to manifest.yaml")
-    parser.add_argument("--output-dir", type=str, default=".", help="Directory to save hmm_left.json and hmm_right.json")
-    parser.add_argument("--cpp-header", type=str, help="Optional path to export C++ header")
-    parser.add_argument("--boundaries", type=int, nargs='+', help="Manual distance boundaries (cm)")
-    parser.add_argument("--num-buckets", type=int, help="Number of even buckets to create (replaces --boundaries)")
-    parser.add_argument("--max-dist", type=int, default=400, help="Max distance for even bucketing (cm)")
+    desc = "Train separate HMMs for Garage133 sides."
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument(
+        "--manifest", type=str, default="manifest.yaml", help="Path to manifest.yaml"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=".",
+        help="Directory to save hmm_left.json and hmm_right.json",
+    )
+    parser.add_argument(
+        "--cpp-header", type=str, help="Optional path to export C++ header"
+    )
+    parser.add_argument(
+        "--boundaries", type=int, nargs="+", help="Manual distance boundaries (cm)"
+    )
+    parser.add_argument(
+        "--num-buckets",
+        type=int,
+        help="Number of even buckets to create (replaces --boundaries)",
+    )
+    parser.add_argument(
+        "--max-dist",
+        type=int,
+        default=400,
+        help="Max distance for even bucketing (cm)",
+    )
 
     args = parser.parse_args()
 
     # Determine boundaries
     if args.num_buckets:
         # Generate N-1 boundaries for N buckets
-        boundaries = np.linspace(0, args.max_dist, args.num_buckets, endpoint=False).tolist()[1:]
+        linspace = np.linspace(0, args.max_dist, args.num_buckets, endpoint=False)
+        boundaries = linspace.tolist()[1:]
         boundaries = [int(b) for b in boundaries]
         print(f"Generated {args.num_buckets} buckets with boundaries: {boundaries}")
     elif args.boundaries:
@@ -156,7 +191,7 @@ if __name__ == "__main__":
         print(f"Error: Manifest {manifest_path} not found.")
         exit(1)
 
-    with manifest_path.open('r') as f:
+    with manifest_path.open("r") as f:
         manifest = yaml.safe_load(f)
 
     # Common parameters

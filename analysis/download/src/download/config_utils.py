@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import yaml
 
 CONFIG_PATH = Path.home() / ".garage133.yaml"
