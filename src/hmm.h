@@ -24,8 +24,7 @@ class HMM {
   bool load(const char* path) {
     File file = LittleFS.open(path, "r");
     if (!file) {
-      Serial.printf("HMM: Failed to open %s
-", path);
+      Serial.printf("HMM: Failed to open %s\n", path);
       return false;
     }
 
@@ -34,8 +33,7 @@ class HMM {
     file.close();
 
     if (error) {
-      Serial.printf("HMM: JSON parse failed: %s
-", error.c_str());
+      Serial.printf("HMM: JSON parse failed: %s\n", error.c_str());
       return false;
     }
 
@@ -69,8 +67,7 @@ class HMM {
 
     m_model.loaded = true;
     reset();
-    Serial.printf("HMM: Loaded model from %s (%d states)
-", path, m_model.num_states);
+    Serial.printf("HMM: Loaded model from %s (%d states)\n", path, m_model.num_states);
     return true;
   }
 
