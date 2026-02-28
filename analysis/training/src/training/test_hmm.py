@@ -1,10 +1,11 @@
-import json
-import yaml
-import pandas as pd
-import numpy as np
 import argparse
-import matplotlib.pyplot as plt
+import json
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import yaml
 
 # State mapping for display
 STATE_NAMES = ["open", "closed_car", "closed_empty"]
@@ -12,7 +13,7 @@ STATE_NAMES = ["open", "closed_car", "closed_empty"]
 class HMMEngine:
     """Python implementation of the ESP32 HMM logic (Forward Algorithm)."""
     def __init__(self, model_path):
-        with open(model_path, 'r') as f:
+        with open(model_path) as f:
             self.model = json.load(f)
         self.boundaries = self.model['boundaries']
         self.A = np.array(self.model['A'])
@@ -61,7 +62,7 @@ def get_metrics(truth, preds):
     correct = np.sum(truth == preds)
     total = len(truth)
     cm = np.zeros((len(STATE_NAMES), len(STATE_NAMES)), dtype=int)
-    for t, p in zip(truth, preds):
+    for t, p in zip(truth, preds, strict=False):
         cm[t, p] += 1
     return correct, total, cm
 
@@ -78,7 +79,7 @@ def print_cm(side_name, correct, total, cm):
 
 def run_test(model_dir, manifest_path, episode_idx=None, show_probs=False, test_all=False):
     manifest_path = Path(manifest_path)
-    with open(manifest_path, 'r') as f:
+    with open(manifest_path) as f:
         manifest = yaml.safe_load(f)
     
     episodes = manifest.get("episodes", [])
@@ -138,7 +139,7 @@ def run_test(model_dir, manifest_path, episode_idx=None, show_probs=False, test_
 
 def test_single_with_plot(model_dir, manifest_path, episode_idx, show_probs):
     # (Original single-episode plotting logic)
-    with open(manifest_path, 'r') as f:
+    with open(manifest_path) as f:
         manifest = yaml.safe_load(f)
     episode = manifest["episodes"][episode_idx]
     file_path = manifest_path.parent / episode["file"]
@@ -147,7 +148,7 @@ def test_single_with_plot(model_dir, manifest_path, episode_idx, show_probs):
     df.sort_values('time', inplace=True)
 
     num_plots = 2 + (2 if show_probs else 0)
-    fig, axes = plt.subplots(num_plots, 1, figsize=(12, 4 * num_plots), sharex=True)
+    _fig, axes = plt.subplots(num_plots, 1, figsize=(12, 4 * num_plots), sharex=True)
 
     for i, side in enumerate(["left", "right"]):
         if side not in episode: continue

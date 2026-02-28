@@ -20,3 +20,21 @@ matplotlib = "^3.10.0"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py312"
+lint.select = [
+    "E",    # pycodestyle
+    "F",    # Pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "RUF",  # Ruff-specific rules
+    "PLC",  # Pylint convention
+    "PLE",  # Pylint error
+    "PLW",  # Pylint warning
+]
+
+[tool.ruff.format]
+docstring-code-format = true

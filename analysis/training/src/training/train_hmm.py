@@ -1,10 +1,11 @@
-import yaml
-import pandas as pd
-import numpy as np
 import argparse
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
 
 # States: Door is open, closed with a car, or closed without a car.
 STATES = ["open", "closed_car", "closed_empty"]
@@ -168,12 +169,12 @@ if __name__ == "__main__":
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Train and save Left
-    print(f"Training left side...")
+    print("Training left side...")
     B_left = train_side_emissions("left", manifest, manifest_path, boundaries)
     save_model("left", A, B_left, pi, boundaries, output_dir)
 
     # Train and save Right
-    print(f"Training right side...")
+    print("Training right side...")
     B_right = train_side_emissions("right", manifest, manifest_path, boundaries)
     save_model("right", A, B_right, pi, boundaries, output_dir)
 
