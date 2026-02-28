@@ -13,3 +13,5 @@ secrets*.yaml
 /KiCAD/*-backups/
 /KiCAD/Gerber/
 /local.ini
+**/__pycache__
+/analysis/sonar_data/

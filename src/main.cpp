@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include "hmm.h"
+
 #define VERSION "0.9.6"
 
 namespace og3 {
@@ -135,16 +137,18 @@ og3::WebButton s_button_right_relay(&s_app.web_server(), "Right button", "/relay
 
 class Classifier : public Module {
  public:
-  Classifier(HAApp* app, const char* door, Relay* relay, MappedAnalogSensor* light,
+  Classifier(HAApp* app, const char* side, Relay* relay, MappedAnalogSensor* light,
              VariableGroup& vg)
-      : Module(door, &app->module_system()),
+      : Module(side, &app->module_system()),
         m_relay(relay),
         m_light(light),
-        m_door_name(String(door) + "_door"),
+        m_side(side),
+        m_door_name(String(side) + "_door"),
         m_car("car", false, "car", vg),
         m_door("door", false, "door", vg) {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
+      loadModel();
       auto* ha_discovery = m_dependencies.ha_discovery();
 
       auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
@@ -195,18 +199,44 @@ class Classifier : public Module {
   }
 
   void setValue(float m) {
-    if (m < 0.10) {
-    } else if (m < 0.7) {
-      set_open(true);      // 0.1 to 0.7
-    } else if (m < 2.4) {  // 0.7 to 2.4
-      set_open(false);
-      set_car(true);
-    } else if (m < 4) {  // 2.0 to 4.0
-      set_open(false);
-      set_car(false);
+    if (m_hmm.isLoaded()) {
+      int state = m_hmm.update(m);
+      // States: 0: open, 1: closed_car, 2: closed_empty
+      switch (state) {
+        case 0:
+          set_open(true);
+          set_car(false);
+          break;
+        case 1:
+          set_open(false);
+          set_car(true);
+          break;
+        case 2:
+          set_open(false);
+          set_car(false);
+          break;
+      }
     } else {
+      // Fallback to basic thresholds if model is not loaded
+      if (m < 0.10) {
+      } else if (m < 0.7) {
+        set_open(true);      // 0.1 to 0.7
+      } else if (m < 2.4) {  // 0.7 to 2.4
+        set_open(false);
+        set_car(true);
+      } else if (m < 4) {  // 2.0 to 4.0
+        set_open(false);
+        set_car(false);
+      }
     }
   }
+
+  void loadModel() {
+    char path[32];
+    snprintf(path, sizeof(path), "/hmm_%s.json", m_side.c_str());
+    m_hmm.load(path);
+  }
+  bool isModelLoaded() const { return m_hmm.isLoaded(); }
 
   bool updated() const { return m_updated; }
   void resetUpdated() { m_updated = false; }
@@ -231,14 +261,43 @@ class Classifier : public Module {
   HADependencies m_dependencies;
   Relay* m_relay;
   MappedAnalogSensor* m_light;
+  String m_side;
   String m_door_name;
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
+  HMM m_hmm;
   bool m_updated = false;
 };
 
 Classifier s_left_classifier(&s_app, "left", &s_left_relay, &s_light_sensor, s_lvg);
 Classifier s_right_classifier(&s_app, "right", &s_right_relay, nullptr, s_rvg);
+
+void handleUpload(AsyncWebServerRequest* request, String filename, size_t index, uint8_t* data,
+                  size_t len, bool final) {
+  static File file;
+  String side = request->url().endsWith("_left") ? "left" : "right";
+  String path = "/hmm_" + side + ".json";
+
+  if (!index) {
+    file = LittleFS.open(path, "w");
+    if (!file) {
+      s_app.log().log("Failed to open file for upload");
+    }
+  }
+  if (file) {
+    file.write(data, len);
+  }
+  if (final) {
+    if (file) {
+      file.close();
+      s_app.log().log(side + " model upload complete. Reloading...");
+      if (side == "left")
+        s_left_classifier.loadModel();
+      else
+        s_right_classifier.loadModel();
+    }
+  }
+}
 
 void update() {
   s_shtc3.read();
@@ -291,6 +350,21 @@ void handleWebRoot(AsyncWebServerRequest* request) {
   // html::writeFormTableInto(&s_html, s_cvg);
   html::writeTableInto(&s_html, s_app.wifi_manager().variables());
   html::writeTableInto(&s_html, s_app.mqtt_manager().variables());
+  s_html += "<h3>HMM Models</h3>";
+  s_html += "<p>Left Model: ";
+  s_html += s_left_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
+  s_html += " | Right Model: ";
+  s_html += s_right_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
+  s_html += "</p>";
+
+  s_html += "<form method='POST' action='/upload_left' enctype='multipart/form-data'>";
+  s_html += "Left: <input type='file' name='model'><input type='submit' value='Upload Left'>";
+  s_html += "</form>";
+
+  s_html += "<form method='POST' action='/upload_right' enctype='multipart/form-data'>";
+  s_html += "Right: <input type='file' name='model'><input type='submit' value='Upload Right'>";
+  s_html += "</form>";
+
   s_button_left_relay.add_button(&s_html);
   s_button_right_relay.add_button(&s_html);
   s_button_wifi_config.add_button(&s_html);
@@ -331,6 +405,13 @@ void setup() {
   og3::s_oled.addDisplayFn([]() { og3::s_oled.display(og3::s_app.board_cname()); });
   og3::s_app.web_server().on("/", og3::handleWebRoot);
   og3::s_app.web_server().on("/config", [](AsyncWebServerRequest* request) {});
+
+  auto upload_cb = [](AsyncWebServerRequest* request) {
+    request->send(200, "text/plain", "Model uploaded and reloaded.");
+  };
+  og3::s_app.web_server().on("/upload_left", HTTP_POST, upload_cb, og3::handleUpload);
+  og3::s_app.web_server().on("/upload_right", HTTP_POST, upload_cb, og3::handleUpload);
+
   og3::s_app.setup();
 }
 

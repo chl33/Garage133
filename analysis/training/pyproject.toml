@@ -1,0 +1,22 @@
+[project]
+name = "training"
+version = "0.1.0"
+description = "HMM training module for Garage133 sonar classification"
+authors = [
+    {name = "Chris Lee", email = "lee.chris.h@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+
+[tool.poetry]
+packages = [{include = "training", from = "src"}]
+
+[tool.poetry.dependencies]
+pandas = "^2.2.0"
+numpy = "^2.0.0"
+PyYAML = "^6.0.1"
+matplotlib = "^3.10.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

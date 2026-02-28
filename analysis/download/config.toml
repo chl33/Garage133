@@ -1,0 +1,51 @@
+## influxctl - example configuration
+
+[[profile]]
+    ## Profile name
+    ## Users can define multiple profile sections and reference them via the
+    ## `--profile {name}` global option. By default, the profile named
+    ## "default" is loaded and used.
+    name = ""
+
+    ## Product type
+    ## Choose from "clustered" or "dedicated"
+    product = ""
+
+    ## Host and port
+    ## InfluxDB hostname/IP address and port. Used for query and write subcommands.
+    ## Required for InfluxDB Clustered.
+    # host = ""
+    # port = "443"
+
+    ## Management Token Auth
+    ## With a management token, a user can perform administrative tasks
+    ## such as creating databases and users. However, a user cannot read or
+    ## write data to databases.
+    # mgmt_token = ""
+
+    ## Database and token
+    ## Used for the query and write subcommands
+    # database = ""
+    # token = ""
+
+    ### Dedicated Specific Options ###
+    ## Account ID and cluster ID
+    # account_id = ""
+    # cluster_id = ""
+
+    ### Clustered Specific Options ###
+    ## Custom client-side TLS certs
+    ## By default, the system certificates are used. If a custom certificate
+    ## for connecting to InfluxDB is required, define it below.
+    # [profile.tls]
+        # cert = ""
+        # key = ""
+        # ca = ""
+
+    ## OAuth2 client authorization settings
+    # [profile.auth.oauth2]
+        # client_id = ""
+        # scopes = [""]
+        # parameters = { audience = "" }
+        # token_url = "https://indentityprovider/oauth2/v1/token"
+        # device_url = "https://indentityprovider/oauth2/v1/auth/device"
