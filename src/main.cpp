@@ -5,19 +5,14 @@
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
 #include <og3/blink_led.h>
-#include <og3/constants.h>
 #include <og3/ha_app.h>
-#include <og3/ha_dependencies.h>
 #include <og3/html_table.h>
 #include <og3/mapped_analog_sensor.h>
-#include <og3/motion_detector.h>
-#include <og3/oled_wifi_info.h>
+#include <og3/oled.h>
 #include <og3/pir.h>
 #include <og3/relay.h>
 #include <og3/shtc3.h>
 #include <og3/sonar.h>
-#include <og3/units.h>
-#include <og3/variable.h>
 #include <og3/wifi_watchdog.h>
 
 #include <algorithm>
@@ -33,111 +28,87 @@ static const char kManufacturer[] = "Chris Lee";
 static const char kModel[] = "Garage133";
 static const char kSoftware[] = "Garage133 v" VERSION;
 
+// --- Garage133 Hardware Configuration ---
+
+// Relays (Door Control)
+const int kRelayLeftPin = 15;
+const int kRelayRightPin = 2;
+
+// Sonar Sensors
+const int kLeftTrigPin = 16;
+const int kLeftEchoPin = 17;
+const int kRightTrigPin = 5;
+const int kRightEchoPin = 18;
+
+// PIR & Light Sensors
+const int kPirPin = 25;
+const int kLightPin = 33;
+
+// Application and configuration.
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
-constexpr App::LogType kLogType = App::LogType::kUdp;
+WifiApp::Options s_app_options =
+    WifiApp::Options()
+    .withDefaultDeviceName("garage133")
+    .withSoftwareName(kSoftware)
+    .withApp(App::Options().withLogType(App::LogType::kUdp);
+    .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS));
 #else
-// constexpr App::LogType kLogType = App::LogType::kNone;  // kSerial
-constexpr App::LogType kLogType = App::LogType::kSerial;
+WifiApp::Options s_app_options =
+    WifiApp::Options()
+        .withDefaultDeviceName("garge133")
+        .withSoftwareName(kSoftware)
+        .withApp(App::Options().withLogType(App::LogType::kSerial));  // kNone
 #endif
 
-HAApp s_app(HAApp::Options(kManufacturer, kModel,
-                           WifiApp::Options()
-                               .withSoftwareName(kSoftware)
-                               .withDefaultDeviceName("rooml33")
-#if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
-                               .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS))
+HAApp::Options s_ha_options(kManufacturer, kModel, s_app_options);
+HAApp s_app(s_ha_options);
 
-#endif
-                               .withOta(OtaManager::Options(OTA_PASSWORD))
-                               .withApp(App::Options().withLogType(kLogType))));
+// Variable Groups for MQTT/Discovery
+VariableGroup s_garage_vg("garage", nullptr, 10);
+VariableGroup s_left_vg("left", nullptr, 2);
+VariableGroup s_right_vg("right", nullptr, 2);
 
-// Hardware config
-constexpr uint8_t kPirPin = 25;
-constexpr int8_t kLSonarTrigger = 16;
-constexpr int8_t kRSonarTrigger = 5;
-constexpr int8_t kLSonarEcho = 17;
-constexpr int8_t kRSonarEcho = 18;
-constexpr uint8_t kRelayLeftPin = 15;
-constexpr uint8_t kRelayRightPin = 2;
-constexpr uint8_t kLightPin = 33;
+// Relay and sensors.
+Relay s_left_relay("left_relay", &s_app.tasks(), kRelayLeftPin, "left relay", true, s_garage_vg);
+Relay s_right_relay("right_relay", &s_app.tasks(), kRelayRightPin, "right relay", true, s_garage_vg);
 
-constexpr int kRelayOnMsec = 10000;
-constexpr int kMqttUpdateMsec = kMsecInMin;
+MappedAnalogSensor::Options s_light_options = {
+    .name = "light",
+    .pin = static_cast<uint8_t>(kLightPin),
+    .units = "percentage",
+    .raw_description = "light raw",
+    .description = "light %",
+    .raw_var_flags = 0,
+    .mapped_var_flags = 0,
+    .config_flags = VariableBase::kConfig | VariableBase::Flags::kSettable,
+    .default_in_min = 0,
+    .default_in_max = 4095,
+    .default_out_min = 100.0f,
+    .default_out_max = 0.0f,
+    .config_decimals = 1,
+    .decimals = 1,
+    .valid_in_min = 0,
+    .valid_in_max = 4095,
+};
+VariableGroup s_light_cfg_vg("light_cfg");
+MappedAnalogSensor s_light_sensor(s_light_options, &s_app.module_system(), s_light_cfg_vg, s_garage_vg);
 
-// Names
-static const char kTemperature[] = "temperature";
-static const char kHumidity[] = "humidity";
-static const char kRelay[] = "relay";
-static const char kLeftSonar[] = "left_sonar";
-static const char kRightSonar[] = "right_sonar";
-static const char kMotion[] = "motion";
-static const char kLight[] = "light";
-static const char kPirModule[] = "PIR";
+Sonar s_left_sonar("left_sonar", kLeftTrigPin, kLeftEchoPin, &s_app.module_system(), s_garage_vg, &s_app.ha_discovery());
+Sonar s_right_sonar("right_sonar", kRightTrigPin, kRightEchoPin, &s_app.module_system(), s_garage_vg, &s_app.ha_discovery());
 
-VariableGroup s_cvg("garage_cfg");
-VariableGroup s_vg("garage");
-VariableGroup s_lvg("left");
-VariableGroup s_rvg("right");
+Pir s_pir("pir", "motion", &s_app.module_system(), kPirPin, "motion", s_garage_vg, true, true);
 
-Shtc3 s_shtc3(kTemperature, kHumidity, &s_app.module_system(), "temperature", s_vg);
+// SHTC3 temperature and humidity sensor.
+Shtc3 s_shtc3("temperature", "humidity", &s_app.module_system(), "climate", s_garage_vg);
 
-Relay s_left_relay(kRelay, &s_app.tasks(), kRelayLeftPin, "Left button", true, s_lvg,
-                   Relay::OnLevel::kHigh);
-Relay s_right_relay(kRelay, &s_app.tasks(), kRelayRightPin, "Right button", true, s_rvg,
-                    Relay::OnLevel::kHigh);
+// OLED display.
+Oled s_oled("oled", &s_app.module_system(), kSoftware);
 
-Sonar s_left_sonar(kLeftSonar, kLSonarTrigger, kLSonarEcho, &s_app.module_system(), s_lvg);
-Sonar s_right_sonar(kRightSonar, kRSonarTrigger, kRSonarEcho, &s_app.module_system(), s_rvg);
-Pir s_pir(kPirModule, kMotion, &s_app.module_system(), kPirPin, kMotion, s_vg, true, true);
-MappedAnalogSensor s_light_sensor(
-    MappedAnalogSensor::Options{
-        .name = kLight,
-        .pin = kLightPin,
-        .units = units::kPercentage,
-        .description = "light %",
-        .raw_var_flags = 0,
-        .mapped_var_flags = 0,
-        .config_flags = VariableBase::kConfig | VariableBase::Flags::kSettable,
-        .default_in_min = 4095,  // kAdcMax
-        .default_in_max = 600,
-        .default_out_min = 0.0f,
-        .default_out_max = 100.0f,
-        .config_decimals = 0,
-        .decimals = 1,
-        .valid_in_min = 0,
-        .valid_in_max = 4095,
-    },
-    &s_app.module_system(), s_cvg, s_vg);
-
-// Global variable for html, so asyncwebserver can send data in the background (single client)
-String s_html;
-
-// Delay between updates of the OLED.
-constexpr unsigned kOledSwitchMsec = 5000;
-OledDisplayRing s_oled(&s_app.module_system(), kSoftware, kOledSwitchMsec, Oled::kTenPt);
-
-// Have oled display IP address or AP status.
-og3::OledWifiInfo wifi_infof(&s_app.tasks());
-
-WebButton s_button_wifi_config = s_app.createWifiConfigButton();
-WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
-WebButton s_button_app_status = s_app.createAppStatusButton();
-WebButton s_button_restart = s_app.createRestartButton();
-
-og3::WebButton s_button_left_relay(&s_app.web_server(), "Left button", "/relay/left",
-                                   [](AsyncWebServerRequest* request) {
-                                     s_left_relay.turnOn(kRelayOnMsec);  // turn on for 1000msec
-                                     request->redirect("/");
-                                   });
-og3::WebButton s_button_right_relay(&s_app.web_server(), "Right button", "/relay/right",
-                                    [](AsyncWebServerRequest* request) {
-                                      s_right_relay.turnOn(kRelayOnMsec);  // turn on for 1000msec
-                                      request->redirect("/");
-                                    });
+const long kMqttUpdateMsec = 60 * kMsecInSec;
 
 class Classifier : public Module {
  public:
-  Classifier(HAApp* app, const char* side, Relay* relay, MappedAnalogSensor* light,
+  Classifier(HAApp * app, const char* side, Relay* relay, MappedAnalogSensor* light,
              VariableGroup& vg)
       : Module(side, &app->module_system()),
         m_relay(relay),
@@ -151,50 +122,27 @@ class Classifier : public Module {
       loadModel();
       auto* ha_discovery = m_dependencies.ha_discovery();
 
-      auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
-        char device_id[80];
-        char entry_name[128];
-        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), m_door_name.c_str());
-        snprintf(entry_name, sizeof(entry_name), "%s_%s", m_door_name.c_str(), entry.var.name());
-        entry.device_name = this->m_door_name.c_str();
-        entry.device_id = device_id;
-        entry.via_device = had->deviceId();
-        entry.entry_name = entry_name;
-        return had->addEntry(json, entry);
-      };
+      ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+        had->addBinarySensor(json, m_car, ha::device_class::binary_sensor::kConnectivity, nullptr,
+                             m_side.c_str());
+        had->addBinarySensor(json, m_door, ha::device_class::binary_sensor::kGarageDoor, nullptr,
+                             m_side.c_str());
 
-      if (m_dependencies.mqtt_manager() && ha_discovery) {
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_door, ha::device_type::kCover,
-                                   ha::device_class::cover::kGarage);
-          String command = String(m_door.name()) + "/set";
-          entry.command = command.c_str();
-          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
-                                                    size_t len) {
-            const bool on =
-                (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
-                (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
-                (0 == strncmp(payload, "CLOSE", len));
-            if (on) {
-              m_relay->turnOn(kRelayOnMsec);
-            }
-          };
-          return addEntry(entry, had, json);
-        });
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
-                                   ha::device_class::binary_sensor::kPresence);
-          entry.icon = "mdi:car";
-          return addEntry(entry, had, json);
-        });
-        if (m_light) {
-          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
-                                                                               JsonDocument* json) {
-            HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
-            return addEntry(entry, had, json);
-          });
-        }
-      }
+        // Add Cover discovery for the door control
+        HADiscovery::Entry cover_entry(m_door, ha::device_type::kCover,
+                                       ha::device_class::cover::kGarage);
+        char cmd_topic[80];
+        snprintf(cmd_topic, sizeof(cmd_topic), "%s/set", had->deviceId());
+        cover_entry.command = cmd_topic;
+        cover_entry.device_id = m_door_name.c_str();
+        cover_entry.device_name = m_door_name.c_str();
+        cover_entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
+          m_relay->turnOn(500);  // 500ms pulse to toggle door
+        };
+        had->addEntry(json, cover_entry);
+
+        return true;
+      });
     });
   }
 
@@ -269,11 +217,11 @@ class Classifier : public Module {
   bool m_updated = false;
 };
 
-Classifier s_left_classifier(&s_app, "left", &s_left_relay, &s_light_sensor, s_lvg);
-Classifier s_right_classifier(&s_app, "right", &s_right_relay, nullptr, s_rvg);
+Classifier s_left_classifier(&s_app, "left", &s_left_relay, &s_light_sensor, s_left_vg);
+Classifier s_right_classifier(&s_app, "right", &s_right_relay, nullptr, s_right_vg);
 
-void handleUpload(AsyncWebServerRequest* request, String filename, size_t index, uint8_t* data,
-                  size_t len, bool final) {
+NetHandlerStatus handleUpload(NetRequest* request, const String& filename, size_t index, uint8_t* data,
+                           size_t len, bool final) {
   static File file;
   String side = request->url().endsWith("_left") ? "left" : "right";
   String path = "/hmm_" + side + ".json";
@@ -297,6 +245,7 @@ void handleUpload(AsyncWebServerRequest* request, String filename, size_t index,
         s_right_classifier.loadModel();
     }
   }
+  NET_REPLY(request, ESP_OK);
 }
 
 void update() {
@@ -308,15 +257,13 @@ void update() {
   s_right_sonar.read();
 
   char text[256];
-  snprintf(text, sizeof(text), "%.3f m %.0f usec | %.3f m %.0f usec | %.1f degf %.0f",
-           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_right_sonar.distance(),
-           s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
-  og3::s_oled.display(text);
+  snprintf(text, sizeof(text), "L:%.2fm R:%.2fm | T:%.1fF L:%.0f%%", s_left_sonar.distance(),
+           s_right_sonar.distance(), s_shtc3.temperaturef(), s_light_sensor.value());
+  s_oled.display(text);
 
   s_app.log().log(text);
 
   s_pir.read();
-  s_light_sensor.read();
 
   if (s_right_sonar.ok()) {
     s_right_classifier.setValue(s_right_sonar.distance());
@@ -329,55 +276,73 @@ void update() {
   static unsigned long s_send_millis = 0;
   if (s_left_classifier.updated() || s_right_classifier.updated() ||
       (now_msec - s_send_millis) > kMqttUpdateMsec || s_send_millis == 0) {
-    s_app.mqttSend(s_vg);
-    s_app.mqttSend(s_lvg);
-    s_app.mqttSend(s_rvg);
+    s_app.mqttSend(s_garage_vg);
+    s_app.mqttSend(s_left_vg);
+    s_app.mqttSend(s_right_vg);
     s_send_millis = now_msec;
     s_left_classifier.resetUpdated();
     s_right_classifier.resetUpdated();
   }
 }
 
-PeriodicTaskScheduler s_update_scheduler(
-    4 * kMsecInSec, 2 * kMsecInSec, []() { update(); }, &s_app.tasks());
+PeriodicTaskScheduler s_update_scheduler(4 * kMsecInSec, 2 * kMsecInSec, []() {
+  update(); },
+                                         &s_app.tasks());
 
-void handleWebRoot(AsyncWebServerRequest* request) {
+og3::WebButton s_button_left_relay(&s_app.web_server_module().native_server(), "Toggle Left Door", "/relay/left",
+                                   [](NetRequest* request) {
+  s_left_relay.turnOn(500);
+  og3::sendWrappedHTML(request, "relay", "", "Left door toggled.");
+  NET_REPLY(request, ESP_OK);
+                                   });
+og3::WebButton s_button_right_relay(&s_app.web_server_module().native_server(), "Toggle Right Door",
+                                    "/relay/right", [](NetRequest* request) {
+  s_right_relay.turnOn(500);
+  og3::sendWrappedHTML(request, "relay", "", "Right door toggled.");
+  NET_REPLY(request, ESP_OK);
+                                    });
+og3::WebButton s_button_wifi_config = s_app.createWifiConfigButton();
+og3::WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
+og3::WebButton s_button_app_status = s_app.createAppStatusButton();
+og3::WebButton s_button_restart = s_app.createRestartButton();
+
+NetHandlerStatus handleWebRoot(NetRequest* request) {
   s_shtc3.read();
-  s_html.clear();
-  html::writeTableInto(&s_html, s_vg);
-  html::writeTableInto(&s_html, s_lvg);
-  html::writeTableInto(&s_html, s_rvg);
-  // html::writeFormTableInto(&s_html, s_cvg);
-  html::writeTableInto(&s_html, s_app.wifi_manager().variables());
-  html::writeTableInto(&s_html, s_app.mqtt_manager().variables());
-  s_html += "<h3>HMM Models</h3>";
-  s_html += "<p>Left Model: ";
-  s_html += s_left_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
-  s_html += " | Right Model: ";
-  s_html += s_right_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
-  s_html += "</p>";
+  String html;
+  html::writeTableInto(&html, s_garage_vg);
+  html::writeTableInto(&html, s_left_vg);
+  html::writeTableInto(&html, s_right_vg);
+  html::writeTableInto(&html, s_app.wifi_manager().variables());
+  html::writeTableInto(&html, s_app.mqtt_manager().variables());
+  html += "<h3>HMM Models</h3>";
+  html += "<p>Left Model: ";
+  html += s_left_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
+  html += " | Right Model: ";
+  html += s_right_classifier.isModelLoaded() ? "Loaded" : "Not Loaded";
+  html += "</p>";
 
-  s_html += "<form method='POST' action='/upload_left' enctype='multipart/form-data'>";
-  s_html += "Left: <input type='file' name='model'><input type='submit' value='Upload Left'>";
-  s_html += "</form>";
+  html += "<form method='POST' action='/upload_left' enctype='multipart/form-data'>";
+  html += "Left: <input type='file' name='model'><input type='submit' value='Upload Left'>";
+  html += "</form>";
 
-  s_html += "<form method='POST' action='/upload_right' enctype='multipart/form-data'>";
-  s_html += "Right: <input type='file' name='model'><input type='submit' value='Upload Right'>";
-  s_html += "</form>";
+  html += "<form method='POST' action='/upload_right' enctype='multipart/form-data'>";
+  html += "Right: <input type='file' name='model'><input type='submit' value='Upload Right'>";
+  html += "</form>";
 
-  s_button_left_relay.add_button(&s_html);
-  s_button_right_relay.add_button(&s_html);
-  s_button_wifi_config.add_button(&s_html);
-  s_button_mqtt_config.add_button(&s_html);
-  s_button_app_status.add_button(&s_html);
-  s_button_restart.add_button(&s_html);
-  sendWrappedHTML(request, s_app.board_cname(), kSoftware, s_html.c_str());
+  s_button_left_relay.add_button(&html);
+  s_button_right_relay.add_button(&html);
+  s_button_wifi_config.add_button(&html);
+  s_button_mqtt_config.add_button(&html);
+  s_button_app_status.add_button(&html);
+  s_button_restart.add_button(&html);
+  sendWrappedHTML(request, s_app.board_cname(), kSoftware, html.c_str());
+  NET_REPLY(request, ESP_OK);
 }
 
 void onMotion() {
-  s_app.mqttSend(s_vg);
+  s_app.mqttSend(s_garage_vg);
   if (s_pir.motion()) {
-    s_app.log().log("Motion detecte!");
+    s_app.log().log("Motion detected!");
     s_oled.display("Motion");
   }
 }
@@ -395,22 +360,24 @@ void checkMotion() {
 }
 
 // Add a watchdog to reboot the device if it locks-up for some reason.
-og3::WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1));
+WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1));
 
 }  // namespace og3
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_oled.addDisplayFn([]() { og3::s_oled.display(og3::s_app.board_cname()); });
-  og3::s_app.web_server().on("/", og3::handleWebRoot);
-  og3::s_app.web_server().on("/config", [](AsyncWebServerRequest* request) {});
+  og3::s_oled.setup();
+  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/config",
+                                    [](og3::NetRequest* request) { NET_REPLY(request, ESP_OK); });
 
-  auto upload_cb = [](AsyncWebServerRequest* request) {
-    request->send(200, "text/plain", "Model uploaded and reloaded.");
+  auto upload_cb = [](og3::NetRequest* request, const String& filename, size_t index, uint8_t* data,
+                      size_t len, bool final) {
+    return og3::handleUpload(request, filename, index, data, len, final);
   };
-  og3::s_app.web_server().on("/upload_left", HTTP_POST, upload_cb, og3::handleUpload);
-  og3::s_app.web_server().on("/upload_right", HTTP_POST, upload_cb, og3::handleUpload);
+  og3::s_app.web_server_module().on("/upload_left", HTTP_POST, og3::handleWebRoot, upload_cb);
+  og3::s_app.web_server_module().on("/upload_right", HTTP_POST, og3::handleWebRoot, upload_cb);
 
   og3::s_app.setup();
 }
