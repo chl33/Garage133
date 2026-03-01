@@ -5,14 +5,19 @@
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
 #include <og3/blink_led.h>
+#include <og3/constants.h>
 #include <og3/ha_app.h>
+#include <og3/ha_dependencies.h>
 #include <og3/html_table.h>
 #include <og3/mapped_analog_sensor.h>
-#include <og3/oled.h>
+#include <og3/motion_detector.h>
+#include <og3/oled_wifi_info.h>
 #include <og3/pir.h>
 #include <og3/relay.h>
 #include <og3/shtc3.h>
 #include <og3/sonar.h>
+#include <og3/units.h>
+#include <og3/variable.h>
 #include <og3/wifi_watchdog.h>
 
 #include <algorithm>
@@ -46,12 +51,11 @@ const int kLightPin = 33;
 
 // Application and configuration.
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
-WifiApp::Options s_app_options =
-    WifiApp::Options()
-    .withDefaultDeviceName("garage133")
-    .withSoftwareName(kSoftware)
-    .withApp(App::Options().withLogType(App::LogType::kUdp);
-    .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS));
+WifiApp::Options s_app_options = WifiApp::Options()
+                                     .withDefaultDeviceName("garage133")
+                                     .withSoftwareName(kSoftware)
+                                     .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS))
+                                     .withApp(App::Options().withLogType(App::LogType::kUdp));
 #else
 WifiApp::Options s_app_options =
     WifiApp::Options()
@@ -70,12 +74,13 @@ VariableGroup s_right_vg("right", nullptr, 2);
 
 // Relay and sensors.
 Relay s_left_relay("left_relay", &s_app.tasks(), kRelayLeftPin, "left relay", true, s_garage_vg);
-Relay s_right_relay("right_relay", &s_app.tasks(), kRelayRightPin, "right relay", true, s_garage_vg);
+Relay s_right_relay("right_relay", &s_app.tasks(), kRelayRightPin, "right relay", true,
+                    s_garage_vg);
 
 MappedAnalogSensor::Options s_light_options = {
     .name = "light",
     .pin = static_cast<uint8_t>(kLightPin),
-    .units = "percentage",
+    .units = units::kPercentage,
     .raw_description = "light raw",
     .description = "light %",
     .raw_var_flags = 0,
@@ -91,10 +96,13 @@ MappedAnalogSensor::Options s_light_options = {
     .valid_in_max = 4095,
 };
 VariableGroup s_light_cfg_vg("light_cfg");
-MappedAnalogSensor s_light_sensor(s_light_options, &s_app.module_system(), s_light_cfg_vg, s_garage_vg);
+MappedAnalogSensor s_light_sensor(s_light_options, &s_app.module_system(), s_light_cfg_vg,
+                                  s_garage_vg);
 
-Sonar s_left_sonar("left_sonar", kLeftTrigPin, kLeftEchoPin, &s_app.module_system(), s_garage_vg, &s_app.ha_discovery());
-Sonar s_right_sonar("right_sonar", kRightTrigPin, kRightEchoPin, &s_app.module_system(), s_garage_vg, &s_app.ha_discovery());
+Sonar s_left_sonar("left_sonar", kLeftTrigPin, kLeftEchoPin, &s_app.module_system(), s_garage_vg,
+                   &s_app.ha_discovery());
+Sonar s_right_sonar("right_sonar", kRightTrigPin, kRightEchoPin, &s_app.module_system(),
+                    s_garage_vg, &s_app.ha_discovery());
 
 Pir s_pir("pir", "motion", &s_app.module_system(), kPirPin, "motion", s_garage_vg, true, true);
 
@@ -104,11 +112,12 @@ Shtc3 s_shtc3("temperature", "humidity", &s_app.module_system(), "climate", s_ga
 // OLED display.
 Oled s_oled("oled", &s_app.module_system(), kSoftware);
 
+constexpr int kRelayOnMsec = 500;  // was 10000;
 const long kMqttUpdateMsec = 60 * kMsecInSec;
 
 class Classifier : public Module {
  public:
-  Classifier(HAApp * app, const char* side, Relay* relay, MappedAnalogSensor* light,
+  Classifier(HAApp* app, const char* side, Relay* relay, MappedAnalogSensor* light,
              VariableGroup& vg)
       : Module(side, &app->module_system()),
         m_relay(relay),
@@ -121,28 +130,50 @@ class Classifier : public Module {
     add_init_fn([this]() {
       loadModel();
       auto* ha_discovery = m_dependencies.ha_discovery();
+      auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
+        char device_id[80];
+        char entry_name[128];
+        snprintf(device_id, sizeof(device_id), "%s_%s", had->deviceId(), m_door_name.c_str());
+        snprintf(entry_name, sizeof(entry_name), "%s_%s", m_door_name.c_str(), entry.var.name());
+        entry.device_name = this->m_door_name.c_str();
+        entry.device_id = device_id;
+        entry.via_device = had->deviceId();
+        entry.entry_name = entry_name;
+        return had->addEntry(json, entry);
+      };
 
-      ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
-        had->addBinarySensor(json, m_car, ha::device_class::binary_sensor::kConnectivity, nullptr,
-                             m_side.c_str());
-        had->addBinarySensor(json, m_door, ha::device_class::binary_sensor::kGarageDoor, nullptr,
-                             m_side.c_str());
-
-        // Add Cover discovery for the door control
-        HADiscovery::Entry cover_entry(m_door, ha::device_type::kCover,
-                                       ha::device_class::cover::kGarage);
-        char cmd_topic[80];
-        snprintf(cmd_topic, sizeof(cmd_topic), "%s/set", had->deviceId());
-        cover_entry.command = cmd_topic;
-        cover_entry.device_id = m_door_name.c_str();
-        cover_entry.device_name = m_door_name.c_str();
-        cover_entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
-          m_relay->turnOn(500);  // 500ms pulse to toggle door
-        };
-        had->addEntry(json, cover_entry);
-
-        return true;
-      });
+      if (m_dependencies.mqtt_manager() && ha_discovery) {
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
+          HADiscovery::Entry entry(m_door, ha::device_type::kCover,
+                                   ha::device_class::cover::kGarage);
+          String command = String(m_door.name()) + "/set";
+          entry.command = command.c_str();
+          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
+                                                    size_t len) {
+            const bool on =
+                (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
+                (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
+                (0 == strncmp(payload, "CLOSE", len));
+            if (on) {
+              m_relay->turnOn(kRelayOnMsec);
+            }
+          };
+          return addEntry(entry, had, json);
+        });
+        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
+          HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
+                                   ha::device_class::binary_sensor::kPresence);
+          entry.icon = "mdi:car";
+          return addEntry(entry, had, json);
+        });
+        if (m_light) {
+          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
+                                                                               JsonDocument* json) {
+            HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
+            return addEntry(entry, had, json);
+          });
+        }
+      }
     });
   }
 
@@ -153,7 +184,7 @@ class Classifier : public Module {
       switch (state) {
         case 0:
           set_open(true);
-          set_car(false);
+          // Don't update information about the car, because we don't know in this state.
           break;
         case 1:
           set_open(false);
@@ -220,8 +251,8 @@ class Classifier : public Module {
 Classifier s_left_classifier(&s_app, "left", &s_left_relay, &s_light_sensor, s_left_vg);
 Classifier s_right_classifier(&s_app, "right", &s_right_relay, nullptr, s_right_vg);
 
-NetHandlerStatus handleUpload(NetRequest* request, const String& filename, size_t index, uint8_t* data,
-                           size_t len, bool final) {
+NetHandlerStatus handleUpload(NetRequest* request, const String& filename, size_t index,
+                              uint8_t* data, size_t len, bool final) {
   static File file;
   String side = request->url().endsWith("_left") ? "left" : "right";
   String path = "/hmm_" + side + ".json";
@@ -257,11 +288,15 @@ void update() {
   s_right_sonar.read();
 
   char text[256];
+  // This format is currently used by the log-parser, so we need to keep it for now.
+  snprintf(text, sizeof(text), "%.3f m %.0f usec | %.3f m %.0f usec | %.1f degf %.0f",
+           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_right_sonar.distance(),
+           s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
+  s_app.log().log(text);
+
   snprintf(text, sizeof(text), "L:%.2fm R:%.2fm | T:%.1fF L:%.0f%%", s_left_sonar.distance(),
            s_right_sonar.distance(), s_shtc3.temperaturef(), s_light_sensor.value());
   s_oled.display(text);
-
-  s_app.log().log(text);
 
   s_pir.read();
 
@@ -285,21 +320,22 @@ void update() {
   }
 }
 
-PeriodicTaskScheduler s_update_scheduler(4 * kMsecInSec, 2 * kMsecInSec, []() {
-  update(); },
-                                         &s_app.tasks());
+PeriodicTaskScheduler s_update_scheduler(
+    4 * kMsecInSec, 2 * kMsecInSec, []() { update(); }, &s_app.tasks());
 
-og3::WebButton s_button_left_relay(&s_app.web_server_module().native_server(), "Toggle Left Door", "/relay/left",
-                                   [](NetRequest* request) {
-  s_left_relay.turnOn(500);
-  og3::sendWrappedHTML(request, "relay", "", "Left door toggled.");
-  NET_REPLY(request, ESP_OK);
+og3::WebButton s_button_left_relay(&s_app.web_server_module().native_server(), "Toggle Left Door",
+                                   "/relay/left", [](NetRequest* request) {
+                                     s_left_relay.turnOn(kRelayOnMsec);
+                                     og3::sendWrappedHTML(request, "relay", "",
+                                                          "Left door toggled.");
+                                     NET_REPLY(request, ESP_OK);
                                    });
 og3::WebButton s_button_right_relay(&s_app.web_server_module().native_server(), "Toggle Right Door",
                                     "/relay/right", [](NetRequest* request) {
-  s_right_relay.turnOn(500);
-  og3::sendWrappedHTML(request, "relay", "", "Right door toggled.");
-  NET_REPLY(request, ESP_OK);
+                                      s_right_relay.turnOn(kRelayOnMsec);
+                                      og3::sendWrappedHTML(request, "relay", "",
+                                                           "Right door toggled.");
+                                      NET_REPLY(request, ESP_OK);
                                     });
 og3::WebButton s_button_wifi_config = s_app.createWifiConfigButton();
 og3::WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
