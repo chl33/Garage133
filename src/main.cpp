@@ -108,7 +108,7 @@ Sonar s_right_sonar("right_sonar", kRightTrigPin, kRightEchoPin, &s_app.module_s
 Pir s_pir("pir", "motion", &s_app.module_system(), kPirPin, "motion", s_garage_vg, true, true);
 
 // SHTC3 temperature and humidity sensor.
-Shtc3 s_shtc3("temperature", "humidity", &s_app.module_system(), "climate", s_garage_vg);
+Shtc3 s_shtc3("temperature", "humidity", &s_app.module_system(), "temperature", s_garage_vg);
 
 // OLED display.
 Oled s_oled("oled", &s_app.module_system(), kSoftware);
@@ -171,7 +171,7 @@ class Classifier : public Module {
           m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
                                                                                JsonDocument* json) {
             HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
-            return addEntry(entry, had, json);
+            return had->addEntry(json, entry);
           });
         }
       }
