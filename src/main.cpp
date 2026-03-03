@@ -25,7 +25,7 @@
 
 #include "hmm.h"
 
-#define VERSION "0.9.6"
+#define VERSION "0.9.7"
 
 namespace og3 {
 
@@ -49,20 +49,21 @@ const int kRightEchoPin = 18;
 const int kPirPin = 25;
 const int kLightPin = 33;
 
-// Application and configuration.
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
-WifiApp::Options s_app_options = WifiApp::Options()
-                                     .withDefaultDeviceName("garage133")
-                                     .withSoftwareName(kSoftware)
-                                     .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS))
-                                     .withApp(App::Options().withLogType(App::LogType::kUdp));
+constexpr App::LogType kLogType = App::LogType::kUdp;
 #else
-WifiApp::Options s_app_options =
-    WifiApp::Options()
-        .withDefaultDeviceName("garge133")
-        .withSoftwareName(kSoftware)
-        .withApp(App::Options().withLogType(App::LogType::kSerial));  // kNone
+constexpr App::LogType kLogType = App::LogType::kSerial;
 #endif
+
+// Application and configuration.
+WifiApp::Options s_app_options = WifiApp::Options()
+                                     .withDefaultDeviceName("bailey-road-garage")
+                                     .withSoftwareName(kSoftware)
+                                     .withApp(App::Options().withLogType(kLogType))
+#if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
+                                     .withUdpLogHost(IPAddress(LOG_UDP_ADDRESS))
+#endif
+                                     .withOta(OtaManager::Options(OTA_PASSWORD));
 
 HAApp::Options s_ha_options(kManufacturer, kModel, s_app_options);
 HAApp s_app(s_ha_options);
@@ -80,7 +81,7 @@ Relay s_right_relay("right_relay", &s_app.tasks(), kRelayRightPin, "right relay"
 MappedAnalogSensor::Options s_light_options = {
     .name = "light",
     .pin = static_cast<uint8_t>(kLightPin),
-    .units = units::kPercentage,
+    .units = "percentage",
     .raw_description = "light raw",
     .description = "light %",
     .raw_var_flags = 0,
@@ -251,8 +252,8 @@ class Classifier : public Module {
 Classifier s_left_classifier(&s_app, "left", &s_left_relay, &s_light_sensor, s_left_vg);
 Classifier s_right_classifier(&s_app, "right", &s_right_relay, nullptr, s_right_vg);
 
-NetHandlerStatus handleUpload(NetRequest* request, const String& filename, size_t index,
-                              uint8_t* data, size_t len, bool final) {
+NetHandlerStatus handleUpload(NetRequest* request, NetResponse* response, const String& filename,
+                              size_t index, uint8_t* data, size_t len, bool final) {
   static File file;
   String side = request->url().endsWith("_left") ? "left" : "right";
   String path = "/hmm_" + side + ".json";
@@ -294,7 +295,7 @@ void update() {
            s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
   s_app.log().log(text);
 
-  snprintf(text, sizeof(text), "L:%.2fm R:%.2fm | T:%.1fF L:%.0f%%", s_left_sonar.distance(),
+  snprintf(text, sizeof(text), "L:%.2fm R:%.2fm\nT:%.1fF L:%.0f%%", s_left_sonar.distance(),
            s_right_sonar.distance(), s_shtc3.temperaturef(), s_light_sensor.value());
   s_oled.display(text);
 
@@ -324,16 +325,16 @@ PeriodicTaskScheduler s_update_scheduler(
     4 * kMsecInSec, 2 * kMsecInSec, []() { update(); }, &s_app.tasks());
 
 og3::WebButton s_button_left_relay(&s_app.web_server_module().native_server(), "Toggle Left Door",
-                                   "/relay/left", [](NetRequest* request) {
-                                     s_left_relay.turnOn(kRelayOnMsec);
-                                     og3::sendWrappedHTML(request, "relay", "",
+                                   "/relay/left", [](NetRequest* request, NetResponse* response) {
+                                     s_left_relay.turnOn(500);
+                                     og3::sendWrappedHTML(request, response, "relay", "",
                                                           "Left door toggled.");
                                      NET_REPLY(request, ESP_OK);
                                    });
 og3::WebButton s_button_right_relay(&s_app.web_server_module().native_server(), "Toggle Right Door",
-                                    "/relay/right", [](NetRequest* request) {
-                                      s_right_relay.turnOn(kRelayOnMsec);
-                                      og3::sendWrappedHTML(request, "relay", "",
+                                    "/relay/right", [](NetRequest* request, NetResponse* response) {
+                                      s_right_relay.turnOn(500);
+                                      og3::sendWrappedHTML(request, response, "relay", "",
                                                            "Right door toggled.");
                                       NET_REPLY(request, ESP_OK);
                                     });
@@ -342,7 +343,7 @@ og3::WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 og3::WebButton s_button_app_status = s_app.createAppStatusButton();
 og3::WebButton s_button_restart = s_app.createRestartButton();
 
-NetHandlerStatus handleWebRoot(NetRequest* request) {
+NetHandlerStatus handleWebRoot(NetRequest* request, NetResponse* response) {
   s_shtc3.read();
   String html;
   html::writeTableInto(&html, s_garage_vg);
@@ -371,7 +372,7 @@ NetHandlerStatus handleWebRoot(NetRequest* request) {
   s_button_mqtt_config.add_button(&html);
   s_button_app_status.add_button(&html);
   s_button_restart.add_button(&html);
-  sendWrappedHTML(request, s_app.board_cname(), kSoftware, html.c_str());
+  sendWrappedHTML(request, response, s_app.board_cname(), kSoftware, html.c_str());
   NET_REPLY(request, ESP_OK);
 }
 
@@ -404,16 +405,28 @@ WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1)
 
 void setup() {
   og3::s_oled.setup();
-  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/config",
-                                    [](og3::NetRequest* request) { NET_REPLY(request, ESP_OK); });
+  og3::s_oled.setFontSize(og3::Oled::FontSize::kTenPt);
+
+  og3::s_app.web_server_module().on(
+      "/", [](og3::NetRequest* r, og3::NetResponse* res) { return og3::handleWebRoot(r, res); });
+  og3::s_app.web_server_module().on(
+      "/config",
+      [](og3::NetRequest* request, og3::NetResponse* response) { NET_REPLY(request, ESP_OK); });
 
   auto upload_cb = [](og3::NetRequest* request, const String& filename, size_t index, uint8_t* data,
                       size_t len, bool final) {
-    return og3::handleUpload(request, filename, index, data, len, final);
+    // We need a dummy response for the upload callback wrapper
+    PsychicResponse res(request);
+    return og3::handleUpload(request, &res, filename, index, data, len, final);
   };
-  og3::s_app.web_server_module().on("/upload_left", HTTP_POST, og3::handleWebRoot, upload_cb);
-  og3::s_app.web_server_module().on("/upload_right", HTTP_POST, og3::handleWebRoot, upload_cb);
+  og3::s_app.web_server_module().on(
+      "/upload_left", HTTP_POST,
+      [](og3::NetRequest* r, og3::NetResponse* res) { return og3::handleWebRoot(r, res); },
+      upload_cb);
+  og3::s_app.web_server_module().on(
+      "/upload_right", HTTP_POST,
+      [](og3::NetRequest* r, og3::NetResponse* res) { return og3::handleWebRoot(r, res); },
+      upload_cb);
 
   og3::s_app.setup();
 }
