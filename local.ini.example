@@ -1,3 +1,7 @@
+[platformio]
+default_envs = usb_node32s
+
 [local]
 build_flags =
 wifi_upload_flags =
+uploadPort = BOARD_WIFI_ADDRESS
