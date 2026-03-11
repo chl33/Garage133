@@ -221,6 +221,25 @@ class Classifier : public Module {
 
   bool doorOpen() const { return m_door.value(); }
   bool carPresent() const { return m_car.value(); }
+  const std::vector<float>& probabilities() const { return m_hmm.probabilities(); }
+  int currentState() const { return m_hmm.currentState(); }
+
+  void forceState(int state) {
+    m_hmm.setState(state);
+    switch (state) {
+      case 0:
+        set_open(true);
+        break;
+      case 1:
+        set_open(false);
+        set_car(true);
+        break;
+      case 2:
+        set_open(false);
+        set_car(false);
+        break;
+    }
+  }
 
   bool updated() const { return m_updated; }
   void resetUpdated() { m_updated = false; }
@@ -477,15 +496,49 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
   left["open"] = s_left_classifier.doorOpen();
   left["car"] = s_left_classifier.carPresent();
   left["dist"] = s_left_sonar.distance();
+  left["modelLoaded"] = s_left_classifier.isModelLoaded();
+  left["currentState"] = s_left_classifier.currentState();
+  JsonArray leftProbs = left["probs"].to<JsonArray>();
+  for (float p : s_left_classifier.probabilities()) {
+    leftProbs.add(p);
+  }
 
   JsonObject right = garage["right"].to<JsonObject>();
   right["open"] = s_right_classifier.doorOpen();
   right["car"] = s_right_classifier.carPresent();
   right["dist"] = s_right_sonar.distance();
+  right["modelLoaded"] = s_right_classifier.isModelLoaded();
+  right["currentState"] = s_right_classifier.currentState();
+  JsonArray rightProbs = right["probs"].to<JsonArray>();
+  for (float p : s_right_classifier.probabilities()) {
+    rightProbs.add(p);
+  }
 
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiPostLabel(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(400, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  String side = obj["side"].as<String>();
+  int state = obj["state"].as<int>();
+
+  if (side == "left") {
+    s_left_classifier.forceState(state);
+  } else if (side == "right") {
+    s_right_classifier.forceState(state);
+  } else {
+    response->send(400, "text/plain", "invalid side");
+    NET_REPLY(request, ESP_FAIL);
+  }
+
+  response->send(200, "application/json", "{\"isOk\":true}");
   NET_REPLY(request, ESP_OK);
 }
 
@@ -552,6 +605,7 @@ void setup() {
 
   og3::s_app.web_server_module().on("/api/garage/left/toggle", HTTP_POST, og3::apiPostLeftRelay);
   og3::s_app.web_server_module().on("/api/garage/right/toggle", HTTP_POST, og3::apiPostRightRelay);
+  og3::s_app.web_server_module().onJson("/api/garage/label", HTTP_POST, og3::apiPostLabel);
 
   og3::s_app.web_server_module().on("/api/restart", HTTP_POST,
                                     [](og3::NetRequest* request, og3::NetResponse* response) {

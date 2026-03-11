@@ -118,17 +118,18 @@ class HMM {
       // For now, we keep previous probs to handle transient garbage readings.
     }
 
-    // 4. Return the most likely state
-    int max_state = 0;
-    for (int i = 1; i < m_model.num_states; i++) {
-      if (m_probs[i] > m_probs[max_state]) {
-        max_state = i;
-      }
+    return currentState();
+  }
+
+  void setState(int state) {
+    if (!m_model.loaded || state < 0 || state >= m_model.num_states) return;
+    for (int i = 0; i < m_model.num_states; i++) {
+      m_probs[i] = (i == state) ? 1.0f : 0.0f;
     }
-    return max_state;
   }
 
   int currentState() const {
+    if (!m_model.loaded || m_probs.empty()) return -1;
     int max_state = 0;
     for (size_t i = 1; i < m_probs.size(); i++) {
       if (m_probs[i] > m_probs[max_state]) {

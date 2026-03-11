@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { Wifi, Radio, Home, RefreshCw, Lock } from 'lucide-svelte';
+  import { Wifi, Radio, Home, RefreshCw, Lock, BrainCircuit } from 'lucide-svelte';
 
   export let currentPage;
   export let systemStatus;
@@ -34,12 +34,20 @@
     <span>Overview</span>
   </button>
 
+  <button
+    class="nav-button"
+    class:active={currentPage === 'models'}
+    on:click={() => navigate('models')}>
+    <BrainCircuit size={20} />
+    <span>HMM Models</span>
+  </button>
+
   <div class="nav-section">Garage Doors</div>
 
   <button
     class="nav-button"
-    class:active={currentPage === 'garage-left'}
-    on:click={() => navigate('home')}>
+    class:active={currentPage === 'door-left'}
+    on:click={() => navigate('door-left')}>
     <Lock size={20} class={status.garage?.left?.open ? "text-red" : "text-green"} />
     <span>Left Door</span>
     <div class="mini-status" class:enabled={!status.garage?.left?.open}></div>
@@ -47,8 +55,8 @@
 
   <button
     class="nav-button"
-    class:active={currentPage === 'garage-right'}
-    on:click={() => navigate('home')}>
+    class:active={currentPage === 'door-right'}
+    on:click={() => navigate('door-right')}>
     <Lock size={20} class={status.garage?.right?.open ? "text-red" : "text-green"} />
     <span>Right Door</span>
     <div class="mini-status" class:enabled={!status.garage?.right?.open}></div>

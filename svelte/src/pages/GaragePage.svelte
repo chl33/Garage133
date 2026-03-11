@@ -1,11 +1,18 @@
 <script>
   import { Thermometer, Wind, Sun, Activity, Lock, Unlock, Car } from 'lucide-svelte';
+  import { createEventDispatcher } from 'svelte';
 
   export let wifi;
   export let mqtt;
   export let systemStatus;
 
+  const dispatch = createEventDispatcher();
+
   $: status = $systemStatus;
+
+  function navigate(page) {
+    dispatch('changePage', page);
+  }
 
   async function toggleDoor(side) {
     try {
@@ -91,10 +98,20 @@
             {status.garage?.left?.car ? 'YES' : 'NO'}
           </span>
         </div>
+        <div class="detail-row">
+          <span class="label">HMM Model:</span>
+          <span class="value" class:active={status.garage?.left?.modelLoaded}>
+            {status.garage?.left?.modelLoaded ? 'Active' : 'Inactive'}
+          </span>
+        </div>
       </div>
 
       <button class="toggle-btn" on:click={() => toggleDoor('left')}>
         Toggle Left Door
+      </button>
+
+      <button class="details-link" on:click={() => navigate('door-left')}>
+        View Details & HMM →
       </button>
     </div>
 
@@ -128,10 +145,20 @@
             {status.garage?.right?.car ? 'YES' : 'NO'}
           </span>
         </div>
+        <div class="detail-row">
+          <span class="label">HMM Model:</span>
+          <span class="value" class:active={status.garage?.right?.modelLoaded}>
+            {status.garage?.right?.modelLoaded ? 'Active' : 'Inactive'}
+          </span>
+        </div>
       </div>
 
       <button class="toggle-btn" on:click={() => toggleDoor('right')}>
         Toggle Right Door
+      </button>
+
+      <button class="details-link" on:click={() => navigate('door-right')}>
+        View Details & HMM →
       </button>
     </div>
   </div>
@@ -266,6 +293,10 @@
     color: #059669;
   }
 
+  .value.active {
+    color: #3b82f6;
+  }
+
   .inline-icon {
     vertical-align: middle;
     margin-right: 0.25rem;
@@ -289,5 +320,21 @@
 
   .toggle-btn:active {
     transform: translateY(1px);
+  }
+
+  .details-link {
+    margin-top: 1rem;
+    background: none;
+    border: none;
+    color: #3b82f6;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .details-link:hover {
+    text-decoration: underline;
+    color: #2563eb;
   }
 </style>

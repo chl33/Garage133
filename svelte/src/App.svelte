@@ -4,6 +4,8 @@
   import Navbar from './components/Navbar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import GaragePage from './pages/GaragePage.svelte';
+  import DoorDetailPage from './pages/DoorDetailPage.svelte';
+  import ModelsPage from './pages/ModelsPage.svelte';
   import WiFiConfigPage from './pages/WiFiConfigPage.svelte';
   import MQTTConfigPage from './pages/MQTTConfigPage.svelte';
 
@@ -132,7 +134,13 @@
     <main class="content">
       <div class="content-inner">
         {#if currentPage === 'home'}
-          <GaragePage {wifi} {mqtt} {systemStatus} />
+          <GaragePage {wifi} {mqtt} {systemStatus} on:changePage={(e) => changePage(e.detail)} />
+        {:else if currentPage === 'door-left'}
+          <DoorDetailPage side="left" {systemStatus} on:changePage={(e) => changePage(e.detail)} />
+        {:else if currentPage === 'door-right'}
+          <DoorDetailPage side="right" {systemStatus} on:changePage={(e) => changePage(e.detail)} />
+        {:else if currentPage === 'models'}
+          <ModelsPage {systemStatus} />
         {:else if currentPage === 'wifi'}
           <WiFiConfigPage {wifi} />
         {:else if currentPage === 'mqtt'}
