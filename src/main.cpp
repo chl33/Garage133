@@ -24,6 +24,7 @@
 #include <cstring>
 
 #include "hmm.h"
+#include "svelteesp32async.h"
 
 #define VERSION "0.9.8"
 
@@ -218,6 +219,9 @@ class Classifier : public Module {
   }
   bool isModelLoaded() const { return m_hmm.isLoaded(); }
 
+  bool doorOpen() const { return m_door.value(); }
+  bool carPresent() const { return m_car.value(); }
+
   bool updated() const { return m_updated; }
   void resetUpdated() { m_updated = false; }
 
@@ -399,6 +403,114 @@ void checkMotion() {
 // Add a watchdog to reboot the device if it locks-up for some reason.
 WifiWatchdog s_watchdog(&s_app, std::chrono::seconds(5), std::chrono::seconds(1));
 
+static String s_body;
+
+NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  const auto& wifi = s_app.wifi_manager();
+  json["board"] = wifi.board();
+  json["password"] = wifi.password();
+  json["essid"] = wifi.essid();
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putWifiConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.wifi_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.wifi_manager().variables());
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  const auto& mqtt = s_app.mqtt_manager();
+  json["enabled"] = mqtt.isEnabled();
+  json["host"] = mqtt.host();
+  json["password"] = mqtt.auth_password();
+  json["user"] = mqtt.auth_user();
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putMqttConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.mqtt_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.mqtt_manager().variables());
+  if (s_app.mqtt_manager().isEnabled() && !s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().connect();
+  } else if (!s_app.mqtt_manager().isEnabled() && s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().disconnect();
+  }
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  json["temperature"] = s_shtc3.temperature();
+  json["humidity"] = s_shtc3.humidity();
+  json["light"] = s_light_sensor.value();
+  json["motion"] = s_pir.motion();
+  json["mqttConnected"] = s_app.mqtt_manager().isConnected();
+  json["software"] = VERSION;
+  json["hardware"] = "Garage133";
+
+  JsonObject garage = json["garage"].to<JsonObject>();
+  JsonObject left = garage["left"].to<JsonObject>();
+  left["open"] = s_left_classifier.doorOpen();
+  left["car"] = s_left_classifier.carPresent();
+  left["dist"] = s_left_sonar.distance();
+
+  JsonObject right = garage["right"].to<JsonObject>();
+  right["open"] = s_right_classifier.doorOpen();
+  right["car"] = s_right_classifier.carPresent();
+  right["dist"] = s_right_sonar.distance();
+
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetPlants(NetRequest* request, NetResponse* response) {
+  response->send(200, "application/json", "[]");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetMoisture(NetRequest* request, NetResponse* response) {
+  response->send(200, "application/json", "[]");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiPostLeftRelay(NetRequest* request, NetResponse* response) {
+  s_left_relay.turnOn(500);
+  response->send(200, "application/json", "{\"isOk\":true}");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiPostRightRelay(NetRequest* request, NetResponse* response) {
+  s_right_relay.turnOn(500);
+  response->send(200, "application/json", "{\"isOk\":true}");
+  NET_REPLY(request, ESP_OK);
+}
+
 }  // namespace og3
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -427,6 +539,26 @@ void setup() {
       "/upload_right", HTTP_POST,
       [](og3::NetRequest* r, og3::NetResponse* res) { return og3::handleWebRoot(r, res); },
       upload_cb);
+
+  initSvelteStaticFiles(&og3::s_app.web_server_module().native_server());
+  og3::s_app.web_server_module().on("/api/wifi", HTTP_GET, og3::apiGetWifi);
+  og3::s_app.web_server_module().on("/api/mqtt", HTTP_GET, og3::apiGetMqtt);
+  og3::s_app.web_server_module().on("/api/status", HTTP_GET, og3::apiGetStatus);
+  og3::s_app.web_server_module().on("/api/plants", HTTP_GET, og3::apiGetPlants);
+  og3::s_app.web_server_module().on("/api/moisture", HTTP_GET, og3::apiGetMoisture);
+
+  og3::s_app.web_server_module().onJson("/api/wifi", HTTP_PUT, og3::putWifiConfig);
+  og3::s_app.web_server_module().onJson("/api/mqtt", HTTP_PUT, og3::putMqttConfig);
+
+  og3::s_app.web_server_module().on("/api/garage/left/toggle", HTTP_POST, og3::apiPostLeftRelay);
+  og3::s_app.web_server_module().on("/api/garage/right/toggle", HTTP_POST, og3::apiPostRightRelay);
+
+  og3::s_app.web_server_module().on("/api/restart", HTTP_POST,
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      response->send(200, "text/plain", "restarting");
+                                      og3::s_app.tasks().runIn(1000, []() { ESP.restart(); });
+                                      NET_REPLY(request, ESP_OK);
+                                    });
 
   og3::s_app.setup();
 }
