@@ -22,9 +22,26 @@
     { id: 2, label: 'Closed (Empty)', color: '#eff6ff' }
   ];
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   async function toggleDoor() {
     try {
-      await fetch(`/api/garage/${side}/toggle`, { method: 'POST' });
+      await fetchWithTimeout(`/api/garage/${side}/toggle`, { method: 'POST' });
     } catch (err) {
       console.error('Toggle failed:', err);
     }
@@ -32,7 +49,7 @@
 
   async function correctState(stateId) {
     try {
-      const response = await fetch('/api/garage/label', {
+      const response = await fetchWithTimeout('/api/garage/label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ side, state: stateId })
@@ -52,9 +69,10 @@
     formData.append('model', file);
 
     try {
-      const response = await fetch(`/upload_${side}`, {
+      const response = await fetchWithTimeout(`/upload_${side}`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        timeout: 30000 // Longer timeout for file upload
       });
       if (!response.ok) throw new Error('Upload failed');
       uploadMessage = 'Model updated successfully';
@@ -327,7 +345,7 @@
   .prob-text { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; font-weight: 700; }
 
   .correction-section h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; }
-  .hint { font-size: 0.75rem; color: #9ca3af; margin-bottom: 1rem; }
+  .hint { font-size: 0.875rem; color: #4b5563; margin-bottom: 1rem; line-height: 1.4; }
 
   .btn-group { display: flex; gap: 0.5rem; }
   .btn-small { flex: 1; padding: 0.5rem; border: 1px solid #d1d5db; background: white; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }

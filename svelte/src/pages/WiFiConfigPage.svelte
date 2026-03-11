@@ -12,6 +12,23 @@
 
   $: wifiConfig = $wifi;
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   function updateWifi(field, value) {
     wifi.update(w => {
       w[field] = value;
@@ -24,7 +41,7 @@
     saveMessage = '';
 
     try {
-      const response = await fetch(`${API_BASE}/wifi`, {
+      const response = await fetchWithTimeout(`${API_BASE}/wifi`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

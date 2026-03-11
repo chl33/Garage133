@@ -15,6 +15,23 @@
   $: mqttConfig = $mqtt;
   $: status = $systemStatus;
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   function updateMqtt(field, value) {
     mqtt.update(m => {
       m[field] = value;
@@ -27,7 +44,7 @@
     saveMessage = '';
 
     try {
-      const response = await fetch(`${API_BASE}/mqtt`, {
+      const response = await fetchWithTimeout(`${API_BASE}/mqtt`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

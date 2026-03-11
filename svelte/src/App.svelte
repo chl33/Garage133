@@ -46,10 +46,29 @@
 
   export let isOnline = writable(true);
 
+  let isUpdating = false;
+
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 4000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   // Load WiFi config from server
   async function loadWiFiConfig() {
     try {
-      const response = await fetch(`${API_BASE}/wifi`);
+      const response = await fetchWithTimeout(`${API_BASE}/wifi`);
       if (!response.ok) throw new Error('Failed to load WiFi config');
       const data = await response.json();
       wifi.set(data);
@@ -63,7 +82,7 @@
   // Load MQTT config from server
   async function loadMQTTConfig() {
     try {
-      const response = await fetch(`${API_BASE}/mqtt`);
+      const response = await fetchWithTimeout(`${API_BASE}/mqtt`);
       if (!response.ok) throw new Error('Failed to load MQTT config');
       const data = await response.json();
       mqtt.set(data);
@@ -76,8 +95,10 @@
 
   // Load system status
   async function loadSystemStatus() {
+    if (isUpdating) return;
+    isUpdating = true;
     try {
-      const response = await fetch(`${API_BASE}/status`);
+      const response = await fetchWithTimeout(`${API_BASE}/status`);
       if (!response.ok) throw new Error('Failed to load system status');
       const data = await response.json();
       systemStatus.set(data);
@@ -85,6 +106,8 @@
     } catch (err) {
       console.error('Error loading system status:', err);
       isOnline.set(false);
+    } finally {
+      isUpdating = false;
     }
   }
 
@@ -103,12 +126,16 @@
       loading = false;
     }
 
-    // Poll status every 5 seconds
-    const updateInterval = setInterval(() => {
-      loadSystemStatus();
-    }, 5000);
+    // Polling mechanism
+    let timer;
+    async function poll() {
+      await loadSystemStatus();
+      timer = setTimeout(poll, 5000);
+    }
 
-    return () => clearInterval(updateInterval);
+    poll();
+
+    return () => clearTimeout(timer);
   });
 
   function changePage(page) {

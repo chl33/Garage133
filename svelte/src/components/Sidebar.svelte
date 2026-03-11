@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { Wifi, Radio, Home, RefreshCw, Lock, BrainCircuit } from 'lucide-svelte';
+  import { Wifi, Radio, Home, RefreshCw, Lock, BrainCircuit, Car } from 'lucide-svelte';
 
   export let currentPage;
   export let systemStatus;
@@ -13,10 +13,27 @@
 
   $: status = $systemStatus;
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   async function restartDevice() {
     if (!confirm('Are you sure you want to restart the device?')) return;
     try {
-      await fetch('/api/restart', { method: 'POST' });
+      await fetchWithTimeout('/api/restart', { method: 'POST' });
       alert('Device is restarting...');
     } catch (err) {
       console.error('Error restarting:', err);
@@ -49,8 +66,8 @@
     class:active={currentPage === 'door-left'}
     on:click={() => navigate('door-left')}>
     <Lock size={20} class={status.garage?.left?.open ? "text-red" : "text-green"} />
-    <span>Left Door</span>
-    <div class="mini-status" class:enabled={!status.garage?.left?.open}></div>
+    <span class="flex-1">Left Door</span>
+    <Car size={18} class={status.garage?.left?.car ? "text-blue" : "text-gray-dim"} />
   </button>
 
   <button
@@ -58,9 +75,10 @@
     class:active={currentPage === 'door-right'}
     on:click={() => navigate('door-right')}>
     <Lock size={20} class={status.garage?.right?.open ? "text-red" : "text-green"} />
-    <span>Right Door</span>
-    <div class="mini-status" class:enabled={!status.garage?.right?.open}></div>
+    <span class="flex-1">Right Door</span>
+    <Car size={18} class={status.garage?.right?.car ? "text-blue" : "text-gray-dim"} />
   </button>
+
 
   <div class="nav-section">System Settings</div>
 
@@ -144,18 +162,6 @@
     flex: 1;
   }
 
-  .mini-status {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ef4444;
-  }
-
-  .mini-status.enabled {
-    background: #10b981;
-    box-shadow: 0 0 4px #10b981;
-  }
-
   .status-text {
     font-size: 0.7rem;
     padding: 0.1rem 0.4rem;
@@ -171,6 +177,7 @@
   :global(.text-green) { color: #10b981; }
   :global(.text-red) { color: #ef4444; }
   :global(.text-blue) { color: #3b82f6; }
+  :global(.text-gray-dim) { color: #4b5563; }
 
   .nav-section {
     margin-top: 1.5rem;

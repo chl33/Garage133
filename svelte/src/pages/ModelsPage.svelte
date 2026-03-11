@@ -8,6 +8,23 @@
   let messages = { left: '', right: '' };
   let files = { left: null, right: null };
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   async function uploadModel(side) {
     if (!files[side]) {
       messages[side] = 'Please select a file first';
@@ -21,9 +38,10 @@
     formData.append('model', files[side]);
 
     try {
-      const response = await fetch(`/upload_${side}`, {
+      const response = await fetchWithTimeout(`/upload_${side}`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        timeout: 30000 // Longer timeout for file upload
       });
 
       if (!response.ok) throw new Error('Upload failed');

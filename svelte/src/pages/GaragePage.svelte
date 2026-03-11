@@ -1,5 +1,5 @@
 <script>
-  import { Thermometer, Wind, Sun, Activity, Lock, Unlock, Car } from 'lucide-svelte';
+  import { Thermometer, Wind, Sun, Activity, Lock, Unlock, Car, Settings } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
 
   export let wifi;
@@ -14,9 +14,26 @@
     dispatch('changePage', page);
   }
 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   async function toggleDoor(side) {
     try {
-      const response = await fetch(`/api/garage/${side}/toggle`, { method: 'POST' });
+      const response = await fetchWithTimeout(`/api/garage/${side}/toggle`, { method: 'POST' });
       if (!response.ok) throw new Error('Failed to toggle door');
       // Status will update via polling
     } catch (err) {
@@ -79,10 +96,21 @@
           {/if}
         </div>
         <div class="header-text">
-          <h3>Left Door</h3>
-          <span class="status-badge" class:open={status.garage?.left?.open}>
-            {status.garage?.left?.open ? 'OPEN' : 'CLOSED'}
-          </span>
+          <div class="title-row">
+            <h3>Left Door</h3>
+            <button class="icon-btn" on:click={() => navigate('door-left')} title="Door Settings">
+              <Settings size={20} />
+            </button>
+          </div>
+          <div class="badge-row">
+            <span class="status-badge" class:open={status.garage?.left?.open}>
+              {status.garage?.left?.open ? 'OPEN' : 'CLOSED'}
+            </span>
+            <span class="presence-badge" class:present={status.garage?.left?.car}>
+              <Car size={14} />
+              {status.garage?.left?.car ? 'CAR' : 'EMPTY'}
+            </span>
+          </div>
         </div>
       </div>
       
@@ -109,10 +137,6 @@
       <button class="toggle-btn" on:click={() => toggleDoor('left')}>
         Toggle Left Door
       </button>
-
-      <button class="details-link" on:click={() => navigate('door-left')}>
-        View Details & HMM →
-      </button>
     </div>
 
     <!-- Right Door Card -->
@@ -126,10 +150,21 @@
           {/if}
         </div>
         <div class="header-text">
-          <h3>Right Door</h3>
-          <span class="status-badge" class:open={status.garage?.right?.open}>
-            {status.garage?.right?.open ? 'OPEN' : 'CLOSED'}
-          </span>
+          <div class="title-row">
+            <h3>Right Door</h3>
+            <button class="icon-btn" on:click={() => navigate('door-right')} title="Door Settings">
+              <Settings size={20} />
+            </button>
+          </div>
+          <div class="badge-row">
+            <span class="status-badge" class:open={status.garage?.right?.open}>
+              {status.garage?.right?.open ? 'OPEN' : 'CLOSED'}
+            </span>
+            <span class="presence-badge" class:present={status.garage?.right?.car}>
+              <Car size={14} />
+              {status.garage?.right?.car ? 'CAR' : 'EMPTY'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -155,10 +190,6 @@
 
       <button class="toggle-btn" on:click={() => toggleDoor('right')}>
         Toggle Right Door
-      </button>
-
-      <button class="details-link" on:click={() => navigate('door-right')}>
-        View Details & HMM →
       </button>
     </div>
   </div>
@@ -242,17 +273,48 @@
     color: #d97706;
   }
 
+  .header-text {
+    flex: 1;
+  }
+
+  .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
   .header-text h3 {
     font-size: 1.25rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
+  }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+  }
+
+  .icon-btn:hover {
+    background: #f3f4f6;
+    color: #3b82f6;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
   }
 
   .status-badge {
     display: inline-block;
-    padding: 0.25rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     background: #e5e7eb;
     color: #4b5563;
@@ -261,6 +323,23 @@
   .status-badge.open {
     background: #fef3c7;
     color: #92400e;
+  }
+
+  .presence-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  .presence-badge.present {
+    background: #dbeafe;
+    color: #1e40af;
   }
 
   .card-body {
@@ -320,21 +399,5 @@
 
   .toggle-btn:active {
     transform: translateY(1px);
-  }
-
-  .details-link {
-    margin-top: 1rem;
-    background: none;
-    border: none;
-    color: #3b82f6;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 0.875rem;
-    text-align: center;
-  }
-
-  .details-link:hover {
-    text-decoration: underline;
-    color: #2563eb;
   }
 </style>

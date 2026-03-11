@@ -26,7 +26,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "0.9.8"
+#define VERSION "0.9.9"
 
 namespace og3 {
 
@@ -58,7 +58,7 @@ constexpr App::LogType kLogType = App::LogType::kSerial;
 
 // Application and configuration.
 WifiApp::Options s_app_options = WifiApp::Options()
-                                     .withDefaultDeviceName("bailey-road-garage")
+                                     .withDefaultDeviceName("garage133")
                                      .withSoftwareName(kSoftware)
                                      .withApp(App::Options().withLogType(kLogType))
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
@@ -572,11 +572,9 @@ void setup() {
   og3::s_oled.setup();
   og3::s_oled.setFontSize(og3::Oled::FontSize::kTenPt);
 
-  og3::s_app.web_server_module().on(
-      "/", [](og3::NetRequest* r, og3::NetResponse* res) { return og3::handleWebRoot(r, res); });
-  og3::s_app.web_server_module().on(
-      "/config",
-      [](og3::NetRequest* request, og3::NetResponse* response) { NET_REPLY(request, ESP_OK); });
+  og3::s_app.web_server_module().on("/root", [](og3::NetRequest* r, og3::NetResponse* res) {
+    return og3::handleWebRoot(r, res);
+  });
 
   auto upload_cb = [](og3::NetRequest* request, const String& filename, size_t index, uint8_t* data,
                       size_t len, bool final) {
