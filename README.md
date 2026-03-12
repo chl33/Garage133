@@ -6,24 +6,29 @@ It provides capability to remotely control up to two garage doors, monitor their
  (temperature/humidity), and detect motion within the garage.
 
 The system is designed to integrate seamlessly with **Home Assistant** via MQTT
- but also provides a standalone Web Interface for control and configuration.
+ but also provides a modern, responsive **Svelte-based Web Interface** for control and configuration.
 
 ![Garage133](images/garage133-1400x600.webp)
 
 ## Features
 
 *   **Dual Door Control:** Independent control for two garage doors using relays.
-*   **Smart State Detection:** Uses sonar sensors to determine if doors are:
-    *   **Open** (Door is rolled up, sensor detects it nearby).
-    *   **Closed with Car** (Door is down, sensor detects car).
-    *   **Closed (Empty)** (Door is down, sensor sees floor).
+*   **HMM State Estimation:** Uses **Hidden Markov Models (HMM)** and sonar sensors to robustly determine door and car states:
+    *   **Open** (Door is rolled up).
+    *   **Closed with Car** (Door is down, vehicle detected).
+    *   **Closed (Empty)** (Door is down, bay is empty).
+*   **Modern Web Dashboard:** A responsive Svelte SPA to:
+    *   Monitor real-time sensor data and door status.
+    *   Trigger door relays remotely.
+    *   Visualize HMM detection probabilities.
+    *   Manually correct/label states to refine detection.
+    *   Upload and reload HMM JSON models dynamically.
 *   **Environmental Monitoring:** SHTC3 sensor for Temperature and Humidity.
 *   **Motion Detection:** PIR sensor integration.
 *   **Light Monitoring:** Analog light sensor to detect garage lighting levels.
-*   **Web Interface:** Built-in web server to view status, control doors, and configure WiFi/MQTT settings.
 *   **Home Assistant:** Native MQTT Discovery support for easy integration.
 *   **OLED Display:** Shows status, IP address, and sensor readings locally.
-*   **OTA Updates:** Support for Over-The-Air firmware updates.
+*   **OTA Updates:** Support for reliable Over-The-Air firmware updates using expanded flash partitions.
 
 ## Hardware
 
@@ -59,6 +64,7 @@ This repository includes files for fabricating the custom PCB and 3D printed cas
 
 ### Prerequisites
 *   [PlatformIO](https://platformio.org/) (VSCode Extension or CLI)
+*   [Node.js & npm](https://nodejs.org/) (For building the Web Interface)
 *   Git
 
 ### Installation
@@ -69,35 +75,36 @@ This repository includes files for fabricating the custom PCB and 3D printed cas
     cd Garage133
     ```
 
-2.  **Configuration:**
+2.  **Build the Web Interface:**
+    Generate the C++ header containing the Svelte assets:
+    ```bash
+    ./build-svelte.sh
+    ```
+
+3.  **Configuration:**
     Copy the example secrets file and configure your environment settings.
     ```bash
     cp secrets.ini.example secrets.ini
     ```
     Edit `secrets.ini` to set your upload port, UDP log target, and OTA password.
 
-    *Note: WiFi and MQTT credentials can be configured via the captive portal on
-	 first boot.*
+-    *Note: WiFi and MQTT credentials can be configured via the captive portal on
+-	 first boot, when you attach to the board's WiFi network named 'garage133.'
+     They can be configured via the web dashboard therafter.*
 
-3.  **Build and Flash:**
-    Connect your ESP32 via USB.
+4.  **Build and Flash:**
+    Connect your ESP32 via USB for the first flash (to apply the `min_spiffs` partition table).
     ```bash
-    pio run --target upload
-    ```
-
-4.  **Monitor:**
-    To view serial output:
-    ```bash
-    pio device monitor
+    pio run -e usb_node32s --target upload
     ```
 
 ## Usage
 
 ### Web Interface
 Once connected to WiFi, navigate to the device's IP address in your browser.
-*   **Control:** Buttons to trigger Left/Right relays.
-*   **Status:** View sensor data (Distance, Temp, Light).
-*   **Config:** Links to configure WiFi and MQTT settings.
+*   **Overview:** Real-time status of both doors and environment.
+*   **Door Details:** Click the Gear icon on a door card to see HMM probabilities, manually label the current state, or upload a new model.
+*   **Settings:** Configure WiFi, MQTT, and restart the device.
 
 ### Home Assistant
 Ensure your Home Assistant instance has an MQTT broker configured.
@@ -105,6 +112,12 @@ The device uses Home Assistant MQTT Discovery. Once the device connects to your 
 *   **Covers:** `left_door`, `right_door` (Open/Close control)
 *   **Sensors:** `temperature`, `humidity`, `light`
 *   **Binary Sensors:** `car` (presence for each bay), `motion`
+
+### HMM Analysis Toolkit
+The `analysis/` directory contains Python tools to help refine your detection models:
+*   Download historical sonar data from InfluxDB, if you have this setup.
+*   Train HMM models using the Viterbi algorithm.
+*   Evaluate and export models to JSON for upload to the device.
 
 ## Blog Post
 For a more detailed write-up on the background and design of this project, please see the [blog post](https://selectiveappeal.org/posts/garage133/).

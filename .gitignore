@@ -13,3 +13,9 @@ secrets*.yaml
 /KiCAD/*-backups/
 /KiCAD/Gerber/
 /local.ini
+**/__pycache__
+/analysis/sonar_data/
+/src/svelteesp32async.h
+/analysis/secrets.sh
+/analysis/training/hmm_left.json
+/analysis/training/hmm_right.json

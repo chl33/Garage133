@@ -19,7 +19,18 @@ jobs:
           python-version: '3.12'
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: svelte/package-lock.json
+      - name: Install Svelte Dependencies
+        run: |
+          cd svelte
+          npm ci
+      - name: Build Svelte Web UI
+        run: ./build-svelte.sh
       - name: Setup secrets for build
-        run: cp secrets.ini.example secrets.ini && cp secrets-usb.ini.example secrets-usb.ini
+        run: cp secrets.ini.example secrets.ini && cp local.ini.example local.ini
       - name: Build PlatformIO Project
         run: pio run

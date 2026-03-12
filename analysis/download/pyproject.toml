@@ -1,0 +1,40 @@
+[project]
+name = "download"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Chris Lee",email = "lee.chris.h@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+
+[tool.poetry]
+packages = [{include = "download", from = "src"}]
+
+[tool.poetry.dependencies]
+influxdb-client = "^1.48.0"
+pandas = "^2.3.3"
+PyYAML = "^6.0.1"
+matplotlib = "^3.10.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py312"
+lint.select = [
+    "E",    # pycodestyle
+    "F",    # Pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "RUF",  # Ruff-specific rules
+    "PLC",  # Pylint convention
+    "PLE",  # Pylint error
+    "PLW",  # Pylint warning
+]
+
+[tool.ruff.format]
+docstring-code-format = true
