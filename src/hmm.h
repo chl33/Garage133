@@ -21,15 +21,37 @@ class Logger {
 
 #include <vector>
 
+class Matrix {
+ public:
+  Matrix() : m_rows(0), m_cols(0) {}
+  Matrix(int rows, int cols) : m_rows(rows), m_cols(cols), m_data(rows * cols, 0.0f) {}
+
+  void resize(int rows, int cols) {
+    m_rows = rows;
+    m_cols = cols;
+    m_data.assign(rows * cols, 0.0f);
+  }
+
+  float& operator()(int r, int c) { return m_data[r * m_cols + c]; }
+  const float& operator()(int r, int c) const { return m_data[r * m_cols + c]; }
+
+  int rows() const { return m_rows; }
+  int cols() const { return m_cols; }
+
+ private:
+  int m_rows, m_cols;
+  std::vector<float> m_data;
+};
+
 class HMM {
  public:
   struct Model {
     int num_states = 0;
     int num_buckets = 0;
-    std::vector<float> boundaries;
-    std::vector<float> pi;              // Initial probabilities
-    std::vector<std::vector<float>> A;  // Transition matrix [from][to]
-    std::vector<std::vector<float>> B;  // Emission matrix [state][bucket]
+    std::vector<float> boundaries;  // sonar distance bucket boundary distances
+    std::vector<float> pi;          // Initial probabilities
+    Matrix A;                       // Transition matrix [from][to]
+    Matrix B;                       // Emission matrix [state][bucket]
     bool loaded = false;
   };
 
@@ -73,19 +95,19 @@ class HMM {
     }
     m_model.num_states = m_model.pi.size();
 
-    m_model.A.assign(m_model.num_states, std::vector<float>(m_model.num_states));
+    m_model.A.resize(m_model.num_states, m_model.num_states);
     JsonArrayConst A_json = doc["A"];
     for (int i = 0; i < m_model.num_states; i++) {
       for (int j = 0; j < m_model.num_states; j++) {
-        m_model.A[i][j] = A_json[i][j];
+        m_model.A(i, j) = A_json[i][j];
       }
     }
 
-    m_model.B.assign(m_model.num_states, std::vector<float>(m_model.num_buckets));
+    m_model.B.resize(m_model.num_states, m_model.num_buckets);
     JsonArrayConst B_json = doc["B"];
     for (int i = 0; i < m_model.num_states; i++) {
       for (int j = 0; j < m_model.num_buckets; j++) {
-        m_model.B[i][j] = B_json[i][j];
+        m_model.B(i, j) = B_json[i][j];
       }
     }
 
@@ -118,14 +140,18 @@ class HMM {
     // 2. Forward Step: P(next_state | observation)
     // new_prob[j] = sum_i( prob[i] * A[i][j] ) * B[j][bucket]
     std::vector<float> next_probs(m_model.num_states, 0.0f);
-    float sum = 0.0f;
 
-    for (int j = 0; j < m_model.num_states; j++) {
-      float transition_prob = 0.0f;
-      for (int i = 0; i < m_model.num_states; i++) {
-        transition_prob += m_probs[i] * m_model.A[i][j];
+    // Optimized loop: Process rows of A to keep memory access contiguous
+    for (int i = 0; i < m_model.num_states; i++) {
+      const float p = m_probs[i];
+      for (int j = 0; j < m_model.num_states; j++) {
+        next_probs[j] += p * m_model.A(i, j);
       }
-      next_probs[j] = transition_prob * m_model.B[j][bucket];
+    }
+
+    float sum = 0.0f;
+    for (int j = 0; j < m_model.num_states; j++) {
+      next_probs[j] *= m_model.B(j, bucket);
       sum += next_probs[j];
     }
 
