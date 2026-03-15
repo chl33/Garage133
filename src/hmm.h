@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <og3/logger.h>
 
 #include <vector>
 
@@ -22,12 +23,12 @@ class HMM {
     bool loaded = false;
   };
 
-  HMM() {}
+  HMM(og3::Logger* logger) : m_logger(logger) {}
 
   bool load(const char* path) {
     File file = LittleFS.open(path, "r");
     if (!file) {
-      Serial.printf("HMM: Failed to open %s\n", path);
+      log()->logf("HMM: Failed to open %s.", path);
       return false;
     }
 
@@ -36,7 +37,7 @@ class HMM {
     file.close();
 
     if (error) {
-      Serial.printf("HMM: JSON parse failed: %s\n", error.c_str());
+      log()->logf("HMM: JSON parse failed: %s.", error.c_str());
       return false;
     }
 
@@ -70,7 +71,7 @@ class HMM {
 
     m_model.loaded = true;
     reset();
-    Serial.printf("HMM: Loaded model from %s (%d states)\n", path, m_model.num_states);
+    log()->logf("HMM: Loaded model from %s (%d states).", path, m_model.num_states);
     return true;
   }
 
@@ -142,7 +143,11 @@ class HMM {
   const std::vector<float>& probabilities() const { return m_probs; }
   bool isLoaded() const { return m_model.loaded; }
 
+ protected:
+  og3::Logger* log() { return m_logger; }
+
  private:
+  og3::Logger* m_logger;
   Model m_model;
   std::vector<float> m_probs;
 };

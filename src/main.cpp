@@ -127,7 +127,8 @@ class Classifier : public Module {
         m_side(side),
         m_door_name(String(side) + "_door"),
         m_car("car", false, "car", vg),
-        m_door("door", false, "door", vg) {
+        m_door("door", false, "door", vg),
+        m_hmm(&app->log()) {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
       loadModel();
