@@ -19,3 +19,6 @@ secrets*.yaml
 /analysis/secrets.sh
 /analysis/training/hmm_left.json
 /analysis/training/hmm_right.json
+/.cache/
+/compile_commands.json
+/svelte/.vite/
