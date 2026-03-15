@@ -104,14 +104,16 @@ class HMM {
     if (!m_model.loaded) return -1;
 
     // 1. Map distance (m) to bucket index
-    float dist_cm = distance_m * 100.0f;
-    int bucket = m_model.num_buckets - 1;  // Default to last bucket (Error/Long)
-    for (size_t i = 0; i < m_model.boundaries.size(); i++) {
-      if (dist_cm < m_model.boundaries[i]) {
-        bucket = i;
-        break;
+    const auto bucket = [this, distance_m]() -> unsigned {
+      const float dist_cm = distance_m * 100.0f;
+      for (size_t i = 0; i < m_model.boundaries.size(); i++) {
+        if (dist_cm < m_model.boundaries[i]) {
+          return i;
+        }
       }
-    }
+      // Default to last bucket (Error/Long)
+      return m_model.num_buckets - 1;
+    }();
 
     // 2. Forward Step: P(next_state | observation)
     // new_prob[j] = sum_i( prob[i] * A[i][j] ) * B[j][bucket]
