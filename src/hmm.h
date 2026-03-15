@@ -6,8 +6,18 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#ifndef NATIVE
 #include <LittleFS.h>
 #include <og3/logger.h>
+#else
+namespace og3 {
+class Logger {
+ public:
+  virtual void log(const char* msg) = 0;
+  virtual void logf(const char* fmt, ...) = 0;
+};
+}  // namespace og3
+#endif
 
 #include <vector>
 
@@ -25,6 +35,7 @@ class HMM {
 
   HMM(og3::Logger* logger) : m_logger(logger) {}
 
+#ifndef NATIVE
   bool load(const char* path) {
     File file = LittleFS.open(path, "r");
     if (!file) {
@@ -41,20 +52,29 @@ class HMM {
       return false;
     }
 
+    if (!loadFromJson(doc)) {
+      return false;
+    }
+    log()->logf("HMM: Loaded model from %s (%d states).", path, m_model.num_states);
+    return true;
+  }
+#endif
+
+  bool loadFromJson(const JsonDocument& doc) {
     m_model.boundaries.clear();
-    for (float b : doc["boundaries"].as<JsonArray>()) {
+    for (float b : doc["boundaries"].as<JsonArrayConst>()) {
       m_model.boundaries.push_back(b);
     }
     m_model.num_buckets = m_model.boundaries.size() + 1;
 
     m_model.pi.clear();
-    for (float p : doc["pi"].as<JsonArray>()) {
+    for (float p : doc["pi"].as<JsonArrayConst>()) {
       m_model.pi.push_back(p);
     }
     m_model.num_states = m_model.pi.size();
 
     m_model.A.assign(m_model.num_states, std::vector<float>(m_model.num_states));
-    JsonArray A_json = doc["A"];
+    JsonArrayConst A_json = doc["A"];
     for (int i = 0; i < m_model.num_states; i++) {
       for (int j = 0; j < m_model.num_states; j++) {
         m_model.A[i][j] = A_json[i][j];
@@ -62,7 +82,7 @@ class HMM {
     }
 
     m_model.B.assign(m_model.num_states, std::vector<float>(m_model.num_buckets));
-    JsonArray B_json = doc["B"];
+    JsonArrayConst B_json = doc["B"];
     for (int i = 0; i < m_model.num_states; i++) {
       for (int j = 0; j < m_model.num_buckets; j++) {
         m_model.B[i][j] = B_json[i][j];
@@ -71,7 +91,6 @@ class HMM {
 
     m_model.loaded = true;
     reset();
-    log()->logf("HMM: Loaded model from %s (%d states).", path, m_model.num_states);
     return true;
   }
 
