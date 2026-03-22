@@ -580,8 +580,6 @@ void setup() {
   og3::s_app.web_server_module().on("/api/wifi", HTTP_GET, og3::apiGetWifi);
   og3::s_app.web_server_module().on("/api/mqtt", HTTP_GET, og3::apiGetMqtt);
   og3::s_app.web_server_module().on("/api/status", HTTP_GET, og3::apiGetStatus);
-  og3::s_app.web_server_module().on("/api/plants", HTTP_GET, og3::apiGetPlants);
-  og3::s_app.web_server_module().on("/api/moisture", HTTP_GET, og3::apiGetMoisture);
 
   og3::s_app.web_server_module().onJson("/api/wifi", HTTP_PUT, og3::putWifiConfig);
   og3::s_app.web_server_module().onJson("/api/mqtt", HTTP_PUT, og3::putMqttConfig);
