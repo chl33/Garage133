@@ -430,8 +430,9 @@ NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
   JsonObject json = jsondoc.to<JsonObject>();
   const auto& wifi = s_app.wifi_manager();
   json["board"] = wifi.board();
-  json["password"] = wifi.password();
-  json["essid"] = wifi.essid();
+  json["wifiPassword"] = wifi.wifiPassword();
+  json["essId"] = wifi.essId();
+  json["ipAddr"] = wifi.ipAddr();
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
@@ -455,9 +456,9 @@ NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
   JsonObject json = jsondoc.to<JsonObject>();
   const auto& mqtt = s_app.mqtt_manager();
   json["enabled"] = mqtt.isEnabled();
-  json["host"] = mqtt.host();
-  json["password"] = mqtt.auth_password();
-  json["user"] = mqtt.auth_user();
+  json["hostAddr"] = mqtt.hostAddr();
+  json["authPassword"] = mqtt.authPassword();
+  json["authUser"] = mqtt.authUser();
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
@@ -493,27 +494,20 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
   json["hardware"] = "Garage133";
 
   JsonObject garage = json["garage"].to<JsonObject>();
-  JsonObject left = garage["left"].to<JsonObject>();
-  left["open"] = s_left_classifier.doorOpen();
-  left["car"] = s_left_classifier.carPresent();
-  left["dist"] = s_left_sonar.distance();
-  left["modelLoaded"] = s_left_classifier.isModelLoaded();
-  left["currentState"] = s_left_classifier.currentState();
-  JsonArray leftProbs = left["probs"].to<JsonArray>();
-  for (float p : s_left_classifier.probabilities()) {
-    leftProbs.add(p);
-  }
-
-  JsonObject right = garage["right"].to<JsonObject>();
-  right["open"] = s_right_classifier.doorOpen();
-  right["car"] = s_right_classifier.carPresent();
-  right["dist"] = s_right_sonar.distance();
-  right["modelLoaded"] = s_right_classifier.isModelLoaded();
-  right["currentState"] = s_right_classifier.currentState();
-  JsonArray rightProbs = right["probs"].to<JsonArray>();
-  for (float p : s_right_classifier.probabilities()) {
-    rightProbs.add(p);
-  }
+  auto getState = [&garage](const char* label, Classifier& classifier, Sonar& sonar) {
+    JsonObject state = garage[label].to<JsonObject>();
+    state["open"] = classifier.doorOpen();
+    state["car"] = classifier.carPresent();
+    state["dist"] = sonar.distance();
+    state["modelLoaded"] = classifier.isModelLoaded();
+    state["currentState"] = classifier.currentState();
+    JsonArray probs = state["probs"].to<JsonArray>();
+    for (float p : classifier.probabilities()) {
+      probs.add(p);
+    }
+  };
+  getState("left", s_left_classifier, s_left_sonar);
+  getState("right", s_right_classifier, s_right_sonar);
 
   s_body.clear();
   serializeJson(jsondoc, s_body);
@@ -540,16 +534,6 @@ NetHandlerStatus apiPostLabel(NetRequest* request, NetResponse* response, JsonVa
   }
 
   response->send(200, "application/json", "{\"isOk\":true}");
-  NET_REPLY(request, ESP_OK);
-}
-
-NetHandlerStatus apiGetPlants(NetRequest* request, NetResponse* response) {
-  response->send(200, "application/json", "[]");
-  NET_REPLY(request, ESP_OK);
-}
-
-NetHandlerStatus apiGetMoisture(NetRequest* request, NetResponse* response) {
-  response->send(200, "application/json", "[]");
   NET_REPLY(request, ESP_OK);
 }
 
