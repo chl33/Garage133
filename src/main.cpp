@@ -7,7 +7,6 @@
 #include <og3/blink_led.h>
 #include <og3/constants.h>
 #include <og3/ha_app.h>
-#include <og3/ha_dependencies.h>
 #include <og3/html_table.h>
 #include <og3/mapped_analog_sensor.h>
 #include <og3/motion_detector.h>
@@ -26,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 
 namespace og3 {
 
@@ -129,10 +128,10 @@ class Classifier : public Module {
         m_car("car", false, "car", vg),
         m_door("door", false, "door", vg),
         m_hmm(&app->log()) {
-    setDependencies(&m_dependencies);
+    require(MqttManager::kName, &m_mqtt_manager);
+    require(HADiscovery::kName, &m_ha_discovery);
     add_init_fn([this]() {
       loadModel();
-      auto* ha_discovery = m_dependencies.ha_discovery();
       auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
         char device_id[80];
         char entry_name[128];
@@ -145,33 +144,34 @@ class Classifier : public Module {
         return had->addEntry(json, entry);
       };
 
-      if (m_dependencies.mqtt_manager() && ha_discovery) {
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_door, ha::device_type::kCover,
-                                   ha::device_class::cover::kGarage);
-          String command = String(m_door.name()) + "/set";
-          entry.command = command.c_str();
-          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
-                                                    size_t len) {
-            const bool on =
-                (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
-                (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
-                (0 == strncmp(payload, "CLOSE", len));
-            if (on) {
-              m_relay->turnOn(kRelayOnMsec);
-            }
-          };
-          return addEntry(entry, had, json);
-        });
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
-                                   ha::device_class::binary_sensor::kPresence);
-          entry.icon = "mdi:car";
-          return addEntry(entry, had, json);
-        });
+      if (m_mqtt_manager && m_ha_discovery) {
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_door, ha::device_type::kCover,
+                                       ha::device_class::cover::kGarage);
+              String command = String(m_door.name()) + "/set";
+              entry.command = command.c_str();
+              entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
+                const bool on =
+                    (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
+                    (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
+                    (0 == strncmp(payload, "CLOSE", len));
+                if (on) {
+                  m_relay->turnOn(kRelayOnMsec);
+                }
+              };
+              return addEntry(entry, had, json);
+            });
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
+                                       ha::device_class::binary_sensor::kPresence);
+              entry.icon = "mdi:car";
+              return addEntry(entry, had, json);
+            });
         if (m_light) {
-          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
-                                                                               JsonDocument* json) {
+          m_ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had,
+                                                                JsonDocument* json) {
             HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
             return had->addEntry(json, entry);
           });
@@ -262,7 +262,6 @@ class Classifier : public Module {
   }
 
  private:
-  HADependencies m_dependencies;
   Relay* m_relay;
   MappedAnalogSensor* m_light;
   String m_side;
@@ -270,6 +269,8 @@ class Classifier : public Module {
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
   HMM m_hmm;
+  MqttManager* m_mqtt_manager = nullptr;
+  HADiscovery* m_ha_discovery = nullptr;
   bool m_updated = false;
 };
 
