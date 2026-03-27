@@ -7,7 +7,6 @@
 #include <og3/blink_led.h>
 #include <og3/constants.h>
 #include <og3/ha_app.h>
-#include <og3/ha_dependencies.h>
 #include <og3/html_table.h>
 #include <og3/mapped_analog_sensor.h>
 #include <og3/motion_detector.h>
@@ -26,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.3"
 
 namespace og3 {
 
@@ -127,11 +126,12 @@ class Classifier : public Module {
         m_side(side),
         m_door_name(String(side) + "_door"),
         m_car("car", false, "car", vg),
-        m_door("door", false, "door", vg) {
-    setDependencies(&m_dependencies);
+        m_door("door", false, "door", vg),
+        m_hmm(&app->log()) {
+    require(MqttManager::kName, &m_mqtt_manager);
+    require(HADiscovery::kName, &m_ha_discovery);
     add_init_fn([this]() {
       loadModel();
-      auto* ha_discovery = m_dependencies.ha_discovery();
       auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
         char device_id[80];
         char entry_name[128];
@@ -144,33 +144,34 @@ class Classifier : public Module {
         return had->addEntry(json, entry);
       };
 
-      if (m_dependencies.mqtt_manager() && ha_discovery) {
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_door, ha::device_type::kCover,
-                                   ha::device_class::cover::kGarage);
-          String command = String(m_door.name()) + "/set";
-          entry.command = command.c_str();
-          entry.command_callback = [this, addEntry](const char* topic, const char* payload,
-                                                    size_t len) {
-            const bool on =
-                (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
-                (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
-                (0 == strncmp(payload, "CLOSE", len));
-            if (on) {
-              m_relay->turnOn(kRelayOnMsec);
-            }
-          };
-          return addEntry(entry, had, json);
-        });
-        ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had, JsonDocument* json) {
-          HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
-                                   ha::device_class::binary_sensor::kPresence);
-          entry.icon = "mdi:car";
-          return addEntry(entry, had, json);
-        });
+      if (m_mqtt_manager && m_ha_discovery) {
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_door, ha::device_type::kCover,
+                                       ha::device_class::cover::kGarage);
+              String command = String(m_door.name()) + "/set";
+              entry.command = command.c_str();
+              entry.command_callback = [this](const char* topic, const char* payload, size_t len) {
+                const bool on =
+                    (0 == strncmp(payload, "ON", len)) || (0 == strncmp(payload, "on", len)) ||
+                    (0 == strncmp(payload, "1", len)) || (0 == strncmp(payload, "OPEN", len)) ||
+                    (0 == strncmp(payload, "CLOSE", len));
+                if (on) {
+                  m_relay->turnOn(kRelayOnMsec);
+                }
+              };
+              return addEntry(entry, had, json);
+            });
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_car, ha::device_type::kBinarySensor,
+                                       ha::device_class::binary_sensor::kPresence);
+              entry.icon = "mdi:car";
+              return addEntry(entry, had, json);
+            });
         if (m_light) {
-          m_dependencies.ha_discovery()->addDiscoveryCallback([this, addEntry](HADiscovery* had,
-                                                                               JsonDocument* json) {
+          m_ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had,
+                                                                JsonDocument* json) {
             HADiscovery::Entry entry(m_light->mapped_value(), ha::device_type::kSensor, nullptr);
             return had->addEntry(json, entry);
           });
@@ -261,7 +262,6 @@ class Classifier : public Module {
   }
 
  private:
-  HADependencies m_dependencies;
   Relay* m_relay;
   MappedAnalogSensor* m_light;
   String m_side;
@@ -269,6 +269,8 @@ class Classifier : public Module {
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
   HMM m_hmm;
+  MqttManager* m_mqtt_manager = nullptr;
+  HADiscovery* m_ha_discovery = nullptr;
   bool m_updated = false;
 };
 
@@ -309,6 +311,7 @@ void update() {
   s_right_sonar.setTemp(s_shtc3.temperature());
   s_left_sonar.setTemp(s_shtc3.temperature());
   s_left_sonar.read();
+  delay(2);  // Wait a short (2msec) time between sonr reaings.
   s_right_sonar.read();
 
   char text[256];
@@ -429,8 +432,9 @@ NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
   JsonObject json = jsondoc.to<JsonObject>();
   const auto& wifi = s_app.wifi_manager();
   json["board"] = wifi.board();
-  json["password"] = wifi.password();
-  json["essid"] = wifi.essid();
+  json["wifiPassword"] = wifi.wifiPassword();
+  json["essId"] = wifi.essId();
+  json["ipAddr"] = wifi.ipAddr();
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
@@ -454,9 +458,9 @@ NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
   JsonObject json = jsondoc.to<JsonObject>();
   const auto& mqtt = s_app.mqtt_manager();
   json["enabled"] = mqtt.isEnabled();
-  json["host"] = mqtt.host();
-  json["password"] = mqtt.auth_password();
-  json["user"] = mqtt.auth_user();
+  json["hostAddr"] = mqtt.hostAddr();
+  json["authPassword"] = mqtt.authPassword();
+  json["authUser"] = mqtt.authUser();
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
@@ -492,27 +496,20 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
   json["hardware"] = "Garage133";
 
   JsonObject garage = json["garage"].to<JsonObject>();
-  JsonObject left = garage["left"].to<JsonObject>();
-  left["open"] = s_left_classifier.doorOpen();
-  left["car"] = s_left_classifier.carPresent();
-  left["dist"] = s_left_sonar.distance();
-  left["modelLoaded"] = s_left_classifier.isModelLoaded();
-  left["currentState"] = s_left_classifier.currentState();
-  JsonArray leftProbs = left["probs"].to<JsonArray>();
-  for (float p : s_left_classifier.probabilities()) {
-    leftProbs.add(p);
-  }
-
-  JsonObject right = garage["right"].to<JsonObject>();
-  right["open"] = s_right_classifier.doorOpen();
-  right["car"] = s_right_classifier.carPresent();
-  right["dist"] = s_right_sonar.distance();
-  right["modelLoaded"] = s_right_classifier.isModelLoaded();
-  right["currentState"] = s_right_classifier.currentState();
-  JsonArray rightProbs = right["probs"].to<JsonArray>();
-  for (float p : s_right_classifier.probabilities()) {
-    rightProbs.add(p);
-  }
+  auto getState = [&garage](const char* label, Classifier& classifier, Sonar& sonar) {
+    JsonObject state = garage[label].to<JsonObject>();
+    state["open"] = classifier.doorOpen();
+    state["car"] = classifier.carPresent();
+    state["dist"] = sonar.distance();
+    state["modelLoaded"] = classifier.isModelLoaded();
+    state["currentState"] = classifier.currentState();
+    JsonArray probs = state["probs"].to<JsonArray>();
+    for (float p : classifier.probabilities()) {
+      probs.add(p);
+    }
+  };
+  getState("left", s_left_classifier, s_left_sonar);
+  getState("right", s_right_classifier, s_right_sonar);
 
   s_body.clear();
   serializeJson(jsondoc, s_body);
@@ -539,16 +536,6 @@ NetHandlerStatus apiPostLabel(NetRequest* request, NetResponse* response, JsonVa
   }
 
   response->send(200, "application/json", "{\"isOk\":true}");
-  NET_REPLY(request, ESP_OK);
-}
-
-NetHandlerStatus apiGetPlants(NetRequest* request, NetResponse* response) {
-  response->send(200, "application/json", "[]");
-  NET_REPLY(request, ESP_OK);
-}
-
-NetHandlerStatus apiGetMoisture(NetRequest* request, NetResponse* response) {
-  response->send(200, "application/json", "[]");
   NET_REPLY(request, ESP_OK);
 }
 
@@ -595,8 +582,6 @@ void setup() {
   og3::s_app.web_server_module().on("/api/wifi", HTTP_GET, og3::apiGetWifi);
   og3::s_app.web_server_module().on("/api/mqtt", HTTP_GET, og3::apiGetMqtt);
   og3::s_app.web_server_module().on("/api/status", HTTP_GET, og3::apiGetStatus);
-  og3::s_app.web_server_module().on("/api/plants", HTTP_GET, og3::apiGetPlants);
-  og3::s_app.web_server_module().on("/api/moisture", HTTP_GET, og3::apiGetMoisture);
 
   og3::s_app.web_server_module().onJson("/api/wifi", HTTP_PUT, og3::putWifiConfig);
   og3::s_app.web_server_module().onJson("/api/mqtt", HTTP_PUT, og3::putMqttConfig);

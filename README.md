@@ -10,6 +10,13 @@ The system is designed to integrate seamlessly with **Home Assistant** via MQTT
 
 ![Garage133](images/garage133-1400x600.webp)
 
+## What's New in v1.0.3
+
+*   **Modernized API**: Full transition to `camelCase` JSON keys for all status and configuration endpoints, enabling simpler and more robust integration with the Svelte frontend.
+*   **og3 v0.6.0 Core**: Leveraging the latest framework improvements, including declarative `require()` dependencies and optimized memory management.
+*   **Automatic Build Pipeline**: Frontend assets are now automatically rebuilt during the PlatformIO compilation process.
+*   **Coding and infrastructure cleanups**: Linting, CI, coding improvements.
+
 ## Features
 
 *   **Dual Door Control:** Independent control for two garage doors using relays.
@@ -29,6 +36,8 @@ The system is designed to integrate seamlessly with **Home Assistant** via MQTT
 *   **Home Assistant:** Native MQTT Discovery support for easy integration.
 *   **OLED Display:** Shows status, IP address, and sensor readings locally.
 *   **OTA Updates:** Support for reliable Over-The-Air firmware updates using expanded flash partitions.
+
+![Web interface](images/garage133-web.png)
 
 ## Hardware
 

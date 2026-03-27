@@ -17,16 +17,16 @@
   let error = null;
 
   export let wifi = writable({
-    essid: '',
-    password: '',
+    essId: '',
+    wifiPassword: '',
     board: 'garage133'
   });
 
   export let mqtt = writable({
-    host: '',
+    hostAddr: '',
     port: 1883,
-    user: '',
-    password: '',
+    authUser: '',
+    authPassword: '',
     enabled: false
   });
 

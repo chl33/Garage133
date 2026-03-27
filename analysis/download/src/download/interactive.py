@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Chris Lee and contributors.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
 import argparse
 import sys
 from datetime import datetime, timedelta
@@ -84,7 +87,7 @@ def interactive_session(date_str, timezone, root_dir):
     temp_csv = Path("temp_buffer.csv")
     print(f"\nDownloading data from {start_utc} to {end_utc}...")
     # Buffer is temporary, root_dir=None to keep it in current working dir
-    download_data(start_utc, end_utc, str(temp_csv), root_dir=None)
+    download_data(start_dt, end_dt, str(temp_csv), root_dir=None)
 
     if not temp_csv.exists():
         print("No data found for this range.")
@@ -230,13 +233,10 @@ def interactive_session(date_str, timezone, root_dir):
             {"time": right_trans.strftime("%Y-%m-%dT%H:%M:%SZ"), "to": right_to}
         )
 
-    final_start = trim_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-    final_end = trim_end.strftime("%Y-%m-%dT%H:%M:%SZ")
-
     print(f"\nSaving final trimmed data: {output_name}")
     download_data(
-        final_start,
-        final_end,
+        trim_start,
+        trim_end,
         output_name,
         "manifest.yaml",
         episode_labels,
@@ -276,9 +276,7 @@ if __name__ == "__main__":
         interactive_session(args.date, args.timezone, root_dir)
 
         cont = (
-            input("Download another episode for this date? (y/n) [y]: ")
-            .strip()
-            .lower()
+            input("Download another episode for this date? (y/n) [y]: ").strip().lower()
         )
         if cont == "n" or cont == "q":
             break

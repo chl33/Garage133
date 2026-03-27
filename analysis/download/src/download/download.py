@@ -1,8 +1,11 @@
+# Copyright (c) 2026 Chris Lee and contributors.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
 import argparse
 import os
 import shutil
 import sys
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -21,7 +24,7 @@ BUCKET = "garage"
 VALID_STATES = ["open", "closed_car", "closed_empty"]
 
 
-def parse_time(time_str, tz="America/New_York"):
+def parse_time(time_str, tz="America/New_York") -> datetime:
     """Parses a time string and returns a UTC ISO-8601 string."""
     if not time_str:
         return None
@@ -29,7 +32,7 @@ def parse_time(time_str, tz="America/New_York"):
         ts = pd.to_datetime(time_str)
         if ts.tzinfo is None:
             ts = ts.tz_localize(tz)
-        return ts.tz_convert("UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
+        return ts.tz_convert("UTC").to_pydatetime()
     except Exception as e:
         print(f"Warning: Could not parse time '{time_str}': {e}")
         return None
@@ -75,6 +78,9 @@ def download_data(
         print("Error: INFLUX_TOKEN environment variable is not set.")
         sys.exit(1)
 
+    start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_time_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
     client = InfluxDBClient(url=URL, token=TOKEN, org=ORG)
     query_api = client.query_api()
 
@@ -89,13 +95,13 @@ def download_data(
     # Flux query
     flux_query = f"""
     from(bucket: "{BUCKET}")
-      |> range(start: {start_time}, stop: {end_time})
+      |> range(start: {start_time_str}, stop: {end_time_str})
       |> filter(fn: (r) => r["_measurement"] == "garage")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     """
 
     print("Querying InfluxDB (v2)...")
-    print(f"Range (UTC): {start_time} to {end_time}")
+    print(f"Range (UTC): {start_time_str} to {end_time_str}")
 
     try:
         df = query_api.query_data_frame(org=ORG, query=flux_query)
@@ -122,10 +128,10 @@ def download_data(
         if manifest_path and labels:
             entry = {
                 "file": output_path.name,
-                "start": start_time,
-                "end": end_time,
+                "start": start_time_str,
+                "end": end_time_str,
                 "left": labels.get("left", {}),
-                "right": labels.get("right", {})
+                "right": labels.get("right", {}),
             }
             update_manifest(manifest_path, entry)
 
@@ -135,16 +141,23 @@ def download_data(
         client.close()
 
 
-if __name__ == "__main__":
+def main() -> bool:
+    """Command-line interface"""
+
     desc = "Download sonar data and label it for HMM training."
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument(
         "--start",
         type=str,
-        required=True,
         help="Start time (e.g., '2026-02-27 10:00:00')",
     )
-    parser.add_argument("--end", type=str, required=True, help="End time")
+    parser.add_argument("--end", type=str, help="End time")
+    parser.add_argument(
+        "-s", "--start-min", type=float, help="Start time in minutes before now"
+    )
+    parser.add_argument(
+        "-d", "--duration-min", type=float, help="Log duration in minutes"
+    )
     parser.add_argument(
         "--timezone",
         type=str,
@@ -154,7 +167,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         type=str,
-        default="sonar_data.csv",
         help="Output CSV file name (relative to root-dir)",
     )
     parser.add_argument(
@@ -172,10 +184,18 @@ if __name__ == "__main__":
 
     # Labels
     parser.add_argument(
-        "--left-state", type=str, choices=VALID_STATES, help="Initial state for left"
+        "--left-state",
+        type=str,
+        choices=VALID_STATES,
+        required=True,
+        help="Initial state for left",
     )
     parser.add_argument(
-        "--right-state", type=str, choices=VALID_STATES, help="Initial state for right"
+        "--right-state",
+        type=str,
+        choices=VALID_STATES,
+        required=True,
+        help="Initial state for right",
     )
     parser.add_argument("--left-trans-time", type=str, help="Transition time for left")
     parser.add_argument(
@@ -201,33 +221,51 @@ if __name__ == "__main__":
         save_config({"root_dir": str(Path(args.set_root_dir).resolve())})
         sys.exit(0)
 
+    # 1. Parse times
+    if args.start_min:
+        start_utc = datetime.now(UTC) - timedelta(minutes=args.start_min)
+    elif args.start:
+        start_utc = parse_time(args.start, args.timezone)
+    else:
+        print("Error: Need to specify either --start-min or --start.")
+        return False
+
+    if args.duration_min:
+        end_utc = start_utc + timedelta(minutes=args.duration_min)
+    elif args.end:
+        end_utc = parse_time(args.end, args.timezone)
+    else:
+        print("Error: Need to specify either --duration-min or --end.")
+        return False
+
+    # 2. Compute output location
     root_dir = get_root_dir(args.root_dir)
     print(f"Using root directory: {root_dir}")
 
-    # 1. Overwrite Protection
-    output_full_path = root_dir / args.output
+    out_name = args.output or f"garage_{start_utc.strftime('%Y-%m-%d_%H%M')}.csv"
+
+    output_full_path = root_dir / out_name
+
+    # 2. Overwrite Protection
     if output_full_path.exists():
         print(f"Error: Output file '{output_full_path}' already exists.")
-        sys.exit(1)
+        return False
 
-    # 2. Parse times
-    start_utc = parse_time(args.start, args.timezone)
-    end_utc = parse_time(args.end, args.timezone)
     left_trans_utc = parse_time(args.left_trans_time, args.timezone)
     right_trans_utc = parse_time(args.right_trans_time, args.timezone)
 
     # 3. Validation
     if start_utc >= end_utc:
         print(f"Error: Start time ({start_utc}) must be before end time ({end_utc}).")
-        sys.exit(1)
+        return False
 
     if left_trans_utc and not (start_utc <= left_trans_utc <= end_utc):
         print(f"Error: Left transition time ({left_trans_utc}) is outside range.")
-        sys.exit(1)
+        return False
 
     if right_trans_utc and not (start_utc <= right_trans_utc <= end_utc):
         print(f"Error: Right transition time ({right_trans_utc}) is outside range.")
-        sys.exit(1)
+        return False
 
     # Build labels
     labels = {
@@ -246,5 +284,11 @@ if __name__ == "__main__":
         )
 
     download_data(
-        start_utc, end_utc, args.output, args.manifest, labels, root_dir=root_dir
+        start_utc, end_utc, out_name, args.manifest, labels, root_dir=root_dir
     )
+    return True
+
+
+if __name__ == "__main__":
+    if not main():
+        sys.exit(1)
