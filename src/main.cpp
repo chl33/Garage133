@@ -25,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "1.0.2"
+#define VERSION "1.0.3"
 
 namespace og3 {
 
@@ -311,6 +311,7 @@ void update() {
   s_right_sonar.setTemp(s_shtc3.temperature());
   s_left_sonar.setTemp(s_shtc3.temperature());
   s_left_sonar.read();
+  delay(2);  // Wait a short (2msec) time between sonr reaings.
   s_right_sonar.read();
 
   char text[256];
