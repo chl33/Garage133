@@ -15,6 +15,7 @@ The system is designed to integrate seamlessly with **Home Assistant** via MQTT
 *   **Modernized API**: Full transition to `camelCase` JSON keys for all status and configuration endpoints, enabling simpler and more robust integration with the Svelte frontend.
 *   **og3 v0.6.0 Core**: Leveraging the latest framework improvements, including declarative `require()` dependencies and optimized memory management.
 *   **Automatic Build Pipeline**: Frontend assets are now automatically rebuilt during the PlatformIO compilation process.
+*   **Coding and infrastructure cleanups**: Linting, CI, coding improvements.
 
 ## Features
 

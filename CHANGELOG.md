@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Framework Upgrade**: Bumped to **og3 v0.6.0**.
 - **Enhanced API Handlers**: Re-implemented web API endpoints using the unified `NetRequest` and `NetResponse` abstraction layer for better portability and robustness.
 - **Automatic Svelte Builds**: Integrated `build_svelte.py` into the PlatformIO lifecycle to ensure the web interface is always in sync with the firmware during the build process.
+*   **Coding and infrastructure cleanups**: Linting, CI, coding improvements.
 
 ## [1.0.0] - 2026-03-10
 
