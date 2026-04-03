@@ -25,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "1.0.3"
+#define VERSION "1.0.4"
 
 namespace og3 {
 
@@ -430,11 +430,7 @@ static String s_body;
 NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
   JsonDocument jsondoc;
   JsonObject json = jsondoc.to<JsonObject>();
-  const auto& wifi = s_app.wifi_manager();
-  json["board"] = wifi.board();
-  json["wifiPassword"] = wifi.wifiPassword();
-  json["essId"] = wifi.essId();
-  json["ipAddr"] = wifi.ipAddr();
+  s_app.wifi_manager().variables().toJson(json, VariableBase::kConfig);
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
@@ -456,11 +452,7 @@ NetHandlerStatus putWifiConfig(NetRequest* request, NetResponse* response, JsonV
 NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
   JsonDocument jsondoc;
   JsonObject json = jsondoc.to<JsonObject>();
-  const auto& mqtt = s_app.mqtt_manager();
-  json["enabled"] = mqtt.isEnabled();
-  json["hostAddr"] = mqtt.hostAddr();
-  json["authPassword"] = mqtt.authPassword();
-  json["authUser"] = mqtt.authUser();
+  s_app.mqtt_manager().variables().toJson(json, VariableBase::kConfig);
   s_body.clear();
   serializeJson(jsondoc, s_body);
   response->send(200, "application/json", s_body.c_str());
