@@ -70,8 +70,8 @@ HAApp s_app(s_ha_options);
 
 // Variable Groups for MQTT/Discovery
 VariableGroup s_garage_vg("garage", nullptr, 10);
-VariableGroup s_left_vg("left", nullptr, 2);
-VariableGroup s_right_vg("right", nullptr, 2);
+VariableGroup s_left_vg("left", nullptr, 6);
+VariableGroup s_right_vg("right", nullptr, 6);
 
 // Relay and sensors.
 Relay s_left_relay("left_relay", &s_app.tasks(), kRelayLeftPin, "left relay", true, s_garage_vg);
@@ -127,11 +127,15 @@ class Classifier : public Module {
         m_door_name(String(side) + "_door"),
         m_car("car", false, "car", vg),
         m_door("door", false, "door", vg),
+        m_prob_open("probOpen", 0.0f, "probability", "prob open", 0, 2, vg),
+        m_prob_car("probCar", 0.0f, "probability", "prob car", 0, 2, vg),
+        m_prob_empty("probEmpty", 0.0f, "probability", "prob empty", 0, 2, vg),
         m_hmm(&app->log()) {
     require(MqttManager::kName, &m_mqtt_manager);
     require(HADiscovery::kName, &m_ha_discovery);
     add_init_fn([this]() {
       loadModel();
+      updateProbs();
       auto addEntry = [this](HADiscovery::Entry& entry, HADiscovery* had, JsonDocument* json) {
         char device_id[80];
         char entry_name[128];
@@ -169,6 +173,24 @@ class Classifier : public Module {
               entry.icon = "mdi:car";
               return addEntry(entry, had, json);
             });
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_prob_open, ha::device_type::kSensor, nullptr);
+              entry.icon = "mdi:gauge";
+              return addEntry(entry, had, json);
+            });
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_prob_car, ha::device_type::kSensor, nullptr);
+              entry.icon = "mdi:gauge";
+              return addEntry(entry, had, json);
+            });
+        m_ha_discovery->addDiscoveryCallback(
+            [this, addEntry](HADiscovery* had, JsonDocument* json) {
+              HADiscovery::Entry entry(m_prob_empty, ha::device_type::kSensor, nullptr);
+              entry.icon = "mdi:gauge";
+              return addEntry(entry, had, json);
+            });
         if (m_light) {
           m_ha_discovery->addDiscoveryCallback([this, addEntry](HADiscovery* had,
                                                                 JsonDocument* json) {
@@ -183,6 +205,7 @@ class Classifier : public Module {
   void setValue(float m) {
     if (m_hmm.isLoaded()) {
       int state = m_hmm.update(m);
+      updateProbs();
       // States: 0: open, 1: closed_car, 2: closed_empty
       switch (state) {
         case 0:
@@ -227,6 +250,7 @@ class Classifier : public Module {
 
   void forceState(int state) {
     m_hmm.setState(state);
+    updateProbs();
     switch (state) {
       case 0:
         set_open(true);
@@ -261,6 +285,15 @@ class Classifier : public Module {
     m_updated = true;
   }
 
+  void updateProbs() {
+    const auto& probs = m_hmm.probabilities();
+    if (probs.size() >= 3) {
+      m_prob_open = probs[0];
+      m_prob_car = probs[1];
+      m_prob_empty = probs[2];
+    }
+  }
+
  private:
   Relay* m_relay;
   MappedAnalogSensor* m_light;
@@ -268,6 +301,9 @@ class Classifier : public Module {
   String m_door_name;
   BinarySensorVariable m_car;
   BinaryCoverSensorVariable m_door;
+  FloatVariable m_prob_open;
+  FloatVariable m_prob_car;
+  FloatVariable m_prob_empty;
   HMM m_hmm;
   MqttManager* m_mqtt_manager = nullptr;
   HADiscovery* m_ha_discovery = nullptr;
