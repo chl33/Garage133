@@ -36,8 +36,8 @@ static const char kSoftware[] = "Garage133 v" VERSION;
 // --- Garage133 Hardware Configuration ---
 
 // Relays (Door Control)
-const int kRelayLeftPin = 15;
-const int kRelayRightPin = 2;
+const int kRelayLeftPin = 4;
+const int kRelayRightPin = 19;
 
 // Sonar Sensors
 const int kLeftTrigPin = 16;
