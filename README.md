@@ -69,6 +69,9 @@ This repository includes files for fabricating the custom PCB and 3D printed cas
 ![Garage133 board](images/garage133-board-1400x728.webp)
 ![Sonar sensor](images/sonar-mounted-1400x1054.webp)
 
+My sonar sensor mount design is
+ [published on printables](https://www.printables.com/model/1741349-sonar-ball-and-socket-mount).
+
 ## Getting Started
 
 ### Prerequisites
