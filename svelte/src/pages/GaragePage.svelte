@@ -115,10 +115,21 @@
       </div>
       
       <div class="card-body">
-        <div class="detail-row">
-          <span class="label">Distance:</span>
-          <span class="value">{formatDist(status.garage?.left?.dist)}</span>
-        </div>
+        {#if (status.garage?.left?.probs?.length === 4) || (status.garage?.left?.dist2 !== undefined && status.garage?.left?.dist2 >= 0)}
+          <div class="detail-row">
+            <span class="label">Sonar 1 (Front):</span>
+            <span class="value">{formatDist(status.garage?.left?.dist)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Sonar 2 (Rear):</span>
+            <span class="value">{formatDist(status.garage?.left?.dist2)}</span>
+          </div>
+        {:else}
+          <div class="detail-row">
+            <span class="label">Distance:</span>
+            <span class="value">{formatDist(status.garage?.left?.dist)}</span>
+          </div>
+        {/if}
         <div class="detail-row">
           <span class="label">Car Present:</span>
           <span class="value" class:present={status.garage?.left?.car}>
@@ -169,10 +180,21 @@
       </div>
 
       <div class="card-body">
-        <div class="detail-row">
-          <span class="label">Distance:</span>
-          <span class="value">{formatDist(status.garage?.right?.dist)}</span>
-        </div>
+        {#if (status.garage?.right?.probs?.length === 4) || (status.garage?.right?.dist2 !== undefined && status.garage?.right?.dist2 >= 0)}
+          <div class="detail-row">
+            <span class="label">Sonar 1 (Front):</span>
+            <span class="value">{formatDist(status.garage?.right?.dist)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Sonar 2 (Rear):</span>
+            <span class="value">{formatDist(status.garage?.right?.dist2)}</span>
+          </div>
+        {:else}
+          <div class="detail-row">
+            <span class="label">Distance:</span>
+            <span class="value">{formatDist(status.garage?.right?.dist)}</span>
+          </div>
+        {/if}
         <div class="detail-row">
           <span class="label">Car Present:</span>
           <span class="value" class:present={status.garage?.right?.car}>

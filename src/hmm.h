@@ -48,10 +48,14 @@ class HMM {
   struct Model {
     int num_states = 0;
     int num_buckets = 0;
-    std::vector<float> boundaries;  // sonar distance bucket boundary distances
-    std::vector<float> pi;          // Initial probabilities
-    Matrix A;                       // Transition matrix [from][to]
-    Matrix B;                       // Emission matrix [state][bucket]
+    std::vector<float> boundaries;   // sonar distance bucket boundary distances
+    std::vector<float> boundaries2;  // sonar 2 distance bucket boundary distances
+    int num_buckets2 = 0;
+    std::vector<float> pi;           // Initial probabilities
+    Matrix A;                        // Transition matrix [from][to]
+    Matrix B;                        // Emission matrix [state][bucket]
+    Matrix B2;                       // Emission matrix for sonar 2 [state][bucket]
+    bool is_dual_sonar = false;
     bool loaded = false;
   };
 
@@ -89,6 +93,16 @@ class HMM {
     }
     m_model.num_buckets = m_model.boundaries.size() + 1;
 
+    m_model.boundaries2.clear();
+    if (doc["boundaries2"].is<JsonArrayConst>()) {
+      for (float b : doc["boundaries2"].as<JsonArrayConst>()) {
+        m_model.boundaries2.push_back(b);
+      }
+    } else {
+      m_model.boundaries2 = m_model.boundaries;
+    }
+    m_model.num_buckets2 = m_model.boundaries2.size() + 1;
+
     m_model.pi.clear();
     for (float p : doc["pi"].as<JsonArrayConst>()) {
       m_model.pi.push_back(p);
@@ -111,6 +125,18 @@ class HMM {
       }
     }
 
+    m_model.is_dual_sonar = false;
+    if (doc["B2"].is<JsonArrayConst>()) {
+      m_model.B2.resize(m_model.num_states, m_model.num_buckets2);
+      JsonArrayConst B2_json = doc["B2"];
+      for (int i = 0; i < m_model.num_states; i++) {
+        for (int j = 0; j < m_model.num_buckets2; j++) {
+          m_model.B2(i, j) = B2_json[i][j];
+        }
+      }
+      m_model.is_dual_sonar = true;
+    }
+
     m_model.loaded = true;
     reset();
     return true;
@@ -121,27 +147,41 @@ class HMM {
     m_probs = m_model.pi;
   }
 
-  // Update probabilities based on a new sonar reading (meters)
-  int update(float distance_m) {
+  // Update probabilities based on a single sonar reading (meters) for backward compatibility
+  int update(float distance_m) { return update(distance_m, -1.0f); }
+
+  // Update probabilities based on two sonar readings (meters)
+  int update(float distance1_m, float distance2_m) {
     if (!m_model.loaded) return -1;
 
-    // 1. Map distance (m) to bucket index
-    const auto bucket = [this, distance_m]() -> unsigned {
-      const float dist_cm = distance_m * 100.0f;
+    // 1. Map distance 1 (m) to bucket index
+    const auto bucket1 = [this, distance1_m]() -> unsigned {
+      if (distance1_m < 0) return m_model.num_buckets - 1;
+      const float dist_cm = distance1_m * 100.0f;
       for (size_t i = 0; i < m_model.boundaries.size(); i++) {
         if (dist_cm < m_model.boundaries[i]) {
           return i;
         }
       }
-      // Default to last bucket (Error/Long)
       return m_model.num_buckets - 1;
     }();
 
-    // 2. Forward Step: P(next_state | observation)
-    // new_prob[j] = sum_i( prob[i] * A[i][j] ) * B[j][bucket]
+    // 2. Map distance 2 (m) to bucket index
+    const auto bucket2 = [this, distance2_m]() -> unsigned {
+      if (distance2_m < 0) return m_model.num_buckets2 - 1;
+      const float dist_cm = distance2_m * 100.0f;
+      for (size_t i = 0; i < m_model.boundaries2.size(); i++) {
+        if (dist_cm < m_model.boundaries2[i]) {
+          return i;
+        }
+      }
+      return m_model.num_buckets2 - 1;
+    }();
+
+    // 3. Forward Step: P(next_state | observation)
+    // next_probs[j] = sum_i( prob[i] * A[i][j] ) * B1[j][bucket1] * B2[j][bucket2]
     std::vector<float> next_probs(m_model.num_states, 0.0f);
 
-    // Optimized loop: Process rows of A to keep memory access contiguous
     for (int i = 0; i < m_model.num_states; i++) {
       const float p = m_probs[i];
       for (int j = 0; j < m_model.num_states; j++) {
@@ -151,19 +191,20 @@ class HMM {
 
     float sum = 0.0f;
     for (int j = 0; j < m_model.num_states; j++) {
-      next_probs[j] *= m_model.B(j, bucket);
+      float emission = m_model.B(j, bucket1);
+      if (m_model.is_dual_sonar) {
+        emission *= m_model.B2(j, bucket2);
+      }
+      next_probs[j] *= emission;
       sum += next_probs[j];
     }
 
-    // 3. Normalize to prevent underflow
+    // 4. Normalize to prevent underflow
     if (sum > 0) {
       for (int j = 0; j < m_model.num_states; j++) {
         next_probs[j] /= sum;
       }
       m_probs = next_probs;
-    } else {
-      // If sum is 0 (impossible observation), reset to pi or stay as is?
-      // For now, we keep previous probs to handle transient garbage readings.
     }
 
     return currentState();
@@ -189,6 +230,8 @@ class HMM {
 
   const std::vector<float>& probabilities() const { return m_probs; }
   bool isLoaded() const { return m_model.loaded; }
+  bool isDualSonar() const { return m_model.is_dual_sonar; }
+  int numStates() const { return m_model.num_states; }
 
  protected:
   og3::Logger* log() { return m_logger; }
