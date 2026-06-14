@@ -2109,7 +2109,7 @@
 	)
 	(global_label "RELAY_CMD1"
 		(shape input)
-		(at 49.53 71.12 180)
+		(at 45.72 71.12 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2119,7 +2119,7 @@
 		)
 		(uuid "7dfc2084-ac41-4eab-8524-625c19ae9408")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 34.752 71.12 0)
+			(at 30.942 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2197,7 +2197,7 @@
 	)
 	(symbol
 		(lib_id "Device:LED")
-		(at 49.53 74.93 90)
+		(at 45.72 74.93 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2205,7 +2205,7 @@
 		(dnp no)
 		(uuid "1251d0aa-46e8-4ed7-bd26-b8bc3b67a254")
 		(property "Reference" "D_R1"
-			(at 44.45 74.295 0)
+			(at 40.64 74.295 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2214,7 +2214,7 @@
 			)
 		)
 		(property "Value" "RED"
-			(at 46.99 72.39 0)
+			(at 43.18 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2223,7 +2223,7 @@
 			)
 		)
 		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
-			(at 49.53 74.93 0)
+			(at 45.72 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2232,7 +2232,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 49.53 74.93 0)
+			(at 45.72 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2241,7 +2241,7 @@
 			)
 		)
 		(property "Description" "Light emitting diode"
-			(at 49.53 74.93 0)
+			(at 45.72 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2250,7 +2250,7 @@
 			)
 		)
 		(property "Sim.Pins" "1=K 2=A"
-			(at 49.53 74.93 0)
+			(at 45.72 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2645,7 +2645,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 49.53 86.36 0)
+		(at 45.72 86.36 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2654,7 +2654,7 @@
 		(fields_autoplaced yes)
 		(uuid "52080c9c-4e7d-4851-89ba-e07889e71e21")
 		(property "Reference" "#PWR035"
-			(at 49.53 92.71 0)
+			(at 45.72 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2663,7 +2663,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 49.53 91.44 0)
+			(at 45.72 91.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2671,7 +2671,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 49.53 86.36 0)
+			(at 45.72 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2680,7 +2680,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 49.53 86.36 0)
+			(at 45.72 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2689,7 +2689,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 49.53 86.36 0)
+			(at 45.72 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3235,7 +3235,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 49.53 82.55 180)
+		(at 45.72 82.55 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3244,7 +3244,7 @@
 		(fields_autoplaced yes)
 		(uuid "b3a07532-51fc-4b63-9454-94a28ad13a46")
 		(property "Reference" "Rl4"
-			(at 52.07 81.28 0)
+			(at 48.26 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3253,7 +3253,7 @@
 			)
 		)
 		(property "Value" "1k"
-			(at 52.07 83.82 0)
+			(at 48.26 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3262,7 +3262,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 51.308 82.55 90)
+			(at 47.498 82.55 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3271,7 +3271,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 49.53 82.55 0)
+			(at 45.72 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3280,7 +3280,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 49.53 82.55 0)
+			(at 45.72 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
