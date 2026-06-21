@@ -420,9 +420,13 @@ void update() {
 
   char text[256];
   // This format is currently used by the log-parser, so we need to keep it for now.
-  snprintf(text, sizeof(text), "%.3f m %.0f usec | %.3f m %.0f usec | %.1f degf %.0f",
-           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_right_sonar.distance(),
-           s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
+  snprintf(text, sizeof(text),
+           "%.3f m %.0f usec, %.3f m %.0f usec "
+           "| %.3f m %.0f usec, %.3f m %.0f usec | %.1f degf %.0f",
+           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_left_sonar_2.distance(),
+           s_left_sonar_2.ping_usec(), s_right_sonar.distance(), s_right_sonar.ping_usec(),
+           s_right_sonar_2.distance(), s_right_sonar_2.ping_usec(), s_shtc3.temperaturef(),
+           s_light_sensor.value());
   s_app.log().log(text);
 
   snprintf(text, sizeof(text), "L:%.2fm R:%.2fm\nT:%.1fF L:%.0f%%", s_left_sonar.distance(),
