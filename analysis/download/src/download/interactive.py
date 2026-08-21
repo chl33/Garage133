@@ -14,8 +14,14 @@ from download.config_utils import get_root_dir, save_config
 from download.download import VALID_STATES, download_data, parse_time
 
 # Mapping for shortcut entry
-STATE_MAP = {"o": "open", "c": "closed_car", "e": "closed_empty"}
-SHORTCUT_HINT = "[o]pen, [c]ar, [e]mpty"
+STATE_MAP = {
+    "o": "open",
+    "c": "closed_car",
+    "e": "closed_empty",
+    "oc": "open_car",
+    "oe": "open_empty",
+}
+SHORTCUT_HINT = "[o]pen, [c]ar, [e]mpty, [oc] open_car, [oe] open_empty"
 
 
 def get_state_input(prompt, default_key):
@@ -121,8 +127,26 @@ def interactive_session(date_str, timezone, root_dir):
     print("- CLOSE WINDOW: Finish early with selected points")
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(df["time"], df["left"], label="Left Sonar", marker=".", markersize=2)
-    ax.plot(df["time"], df["right"], label="Right Sonar", marker=".", markersize=2)
+    ax.plot(df["time"], df["left"], label="Left Sonar 1", marker=".", markersize=2)
+    ax.plot(df["time"], df["right"], label="Right Sonar 1", marker=".", markersize=2)
+    if "left_2" in df.columns:
+        ax.plot(
+            df["time"],
+            df["left_2"],
+            label="Left Sonar 2",
+            marker=".",
+            markersize=2,
+            alpha=0.6,
+        )
+    if "right_2" in df.columns:
+        ax.plot(
+            df["time"],
+            df["right_2"],
+            label="Right Sonar 2",
+            marker=".",
+            markersize=2,
+            alpha=0.6,
+        )
     ax.set_title(f"Garage Sonar: {date_str} (approx {start_hour})")
     ax.set_ylabel("Distance (m)")
     ax.legend()
@@ -185,9 +209,7 @@ def interactive_session(date_str, timezone, root_dir):
 
     # 4. Final Metadata Gathering in Terminal
     print("\n--- Episode Metadata ---")
-    default_name = (
-        f"garage_{date_str.replace(' ', '_')}_{start_hour.replace(':', '')}.csv"
-    )
+    default_name = f"garage_{date_str.replace(' ', '_')}_{start_hour.replace(':', '')}.csv"
     output_name = get_input("CSV Filename (e.g., event_001.csv)", default_name)
     if output_name == "q":
         print("Aborting session. Data not saved.")
@@ -252,9 +274,7 @@ if __name__ == "__main__":
         help="Date (YYYY-MM-DD), defaults to today",
         default=datetime.now().strftime("%Y-%m-%d"),
     )
-    parser.add_argument(
-        "--timezone", type=str, default="America/New_York", help="Local timezone"
-    )
+    parser.add_argument("--timezone", type=str, default="America/New_York", help="Local timezone")
     parser.add_argument("--root-dir", type=str, help="Output root directory")
     parser.add_argument(
         "--set-root-dir",
@@ -275,8 +295,6 @@ if __name__ == "__main__":
         print(f"\n--- New Interactive Session (Date: {args.date}) ---")
         interactive_session(args.date, args.timezone, root_dir)
 
-        cont = (
-            input("Download another episode for this date? (y/n) [y]: ").strip().lower()
-        )
+        cont = input("Download another episode for this date? (y/n) [y]: ").strip().lower()
         if cont == "n" or cont == "q":
             break

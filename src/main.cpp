@@ -36,14 +36,20 @@ static const char kSoftware[] = "Garage133 v" VERSION;
 // --- Garage133 Hardware Configuration ---
 
 // Relays (Door Control)
-const int kRelayLeftPin = 15;
-const int kRelayRightPin = 2;
+const int kRelayLeftPin = 4;
+const int kRelayRightPin = 19;
 
 // Sonar Sensors
 const int kLeftTrigPin = 16;
 const int kLeftEchoPin = 17;
 const int kRightTrigPin = 5;
 const int kRightEchoPin = 18;
+
+// Sonar Sensors (Rear - Sonar 2)
+const int kLeftTrig2Pin = 23;
+const int kLeftEcho2Pin = 26;
+const int kRightTrig2Pin = 27;
+const int kRightEcho2Pin = 32;
 
 // PIR & Light Sensors
 const int kPirPin = 25;
@@ -104,6 +110,10 @@ Sonar s_left_sonar("left_sonar", kLeftTrigPin, kLeftEchoPin, &s_app.module_syste
                    &s_app.ha_discovery());
 Sonar s_right_sonar("right_sonar", kRightTrigPin, kRightEchoPin, &s_app.module_system(),
                     s_garage_vg, &s_app.ha_discovery());
+Sonar s_left_sonar_2("left_sonar_2", kLeftTrig2Pin, kLeftEcho2Pin, &s_app.module_system(),
+                     s_garage_vg, &s_app.ha_discovery());
+Sonar s_right_sonar_2("right_sonar_2", kRightTrig2Pin, kRightEcho2Pin, &s_app.module_system(),
+                      s_garage_vg, &s_app.ha_discovery());
 
 Pir s_pir("pir", "motion", &s_app.module_system(), kPirPin, "motion", s_garage_vg, true, true);
 
@@ -202,34 +212,60 @@ class Classifier : public Module {
     });
   }
 
-  void setValue(float m) {
+  void setValue(float m1, float m2) {
     if (m_hmm.isLoaded()) {
-      int state = m_hmm.update(m);
+      int state;
+      if (m_hmm.isDualSonar()) {
+        state = m_hmm.update(m1, m2);
+      } else {
+        state = m_hmm.update(m1);
+      }
       updateProbs();
-      // States: 0: open, 1: closed_car, 2: closed_empty
-      switch (state) {
-        case 0:
-          set_open(true);
-          // Don't update information about the car, because we don't know in this state.
-          break;
-        case 1:
-          set_open(false);
-          set_car(true);
-          break;
-        case 2:
-          set_open(false);
-          set_car(false);
-          break;
+      if (m_hmm.numStates() == 4) {
+        // States: 0: open_car, 1: open_empty, 2: closed_car, 3: closed_empty
+        switch (state) {
+          case 0:
+            set_open(true);
+            set_car(true);
+            break;
+          case 1:
+            set_open(true);
+            set_car(false);
+            break;
+          case 2:
+            set_open(false);
+            set_car(true);
+            break;
+          case 3:
+            set_open(false);
+            set_car(false);
+            break;
+        }
+      } else {
+        // Fallback for 3-state model: 0: open, 1: closed_car, 2: closed_empty
+        switch (state) {
+          case 0:
+            set_open(true);
+            break;
+          case 1:
+            set_open(false);
+            set_car(true);
+            break;
+          case 2:
+            set_open(false);
+            set_car(false);
+            break;
+        }
       }
     } else {
-      // Fallback to basic thresholds if model is not loaded
-      if (m < 0.10) {
-      } else if (m < 0.7) {
-        set_open(true);      // 0.1 to 0.7
-      } else if (m < 2.4) {  // 0.7 to 2.4
+      // Fallback to basic thresholds if model is not loaded (using only front sonar m1)
+      if (m1 < 0.10) {
+      } else if (m1 < 0.7) {
+        set_open(true);       // 0.1 to 0.7
+      } else if (m1 < 2.4) {  // 0.7 to 2.4
         set_open(false);
         set_car(true);
-      } else if (m < 4) {  // 2.0 to 4.0
+      } else if (m1 < 4) {  // 2.0 to 4.0
         set_open(false);
         set_car(false);
       }
@@ -251,18 +287,39 @@ class Classifier : public Module {
   void forceState(int state) {
     m_hmm.setState(state);
     updateProbs();
-    switch (state) {
-      case 0:
-        set_open(true);
-        break;
-      case 1:
-        set_open(false);
-        set_car(true);
-        break;
-      case 2:
-        set_open(false);
-        set_car(false);
-        break;
+    if (m_hmm.numStates() == 4) {
+      switch (state) {
+        case 0:
+          set_open(true);
+          set_car(true);
+          break;
+        case 1:
+          set_open(true);
+          set_car(false);
+          break;
+        case 2:
+          set_open(false);
+          set_car(true);
+          break;
+        case 3:
+          set_open(false);
+          set_car(false);
+          break;
+      }
+    } else {
+      switch (state) {
+        case 0:
+          set_open(true);
+          break;
+        case 1:
+          set_open(false);
+          set_car(true);
+          break;
+        case 2:
+          set_open(false);
+          set_car(false);
+          break;
+      }
     }
   }
 
@@ -287,7 +344,11 @@ class Classifier : public Module {
 
   void updateProbs() {
     const auto& probs = m_hmm.probabilities();
-    if (probs.size() >= 3) {
+    if (probs.size() == 4) {
+      m_prob_open = probs[0] + probs[1];
+      m_prob_car = probs[0] + probs[2];
+      m_prob_empty = probs[1] + probs[3];
+    } else if (probs.size() == 3) {
       m_prob_open = probs[0];
       m_prob_car = probs[1];
       m_prob_empty = probs[2];
@@ -346,15 +407,26 @@ void update() {
   s_light_sensor.read();
   s_right_sonar.setTemp(s_shtc3.temperature());
   s_left_sonar.setTemp(s_shtc3.temperature());
+  s_right_sonar_2.setTemp(s_shtc3.temperature());
+  s_left_sonar_2.setTemp(s_shtc3.temperature());
+
   s_left_sonar.read();
-  delay(2);  // Wait a short (2msec) time between sonr reaings.
+  delay(4);  // Wait a short (2msec) time between sonar readings.
   s_right_sonar.read();
+  delay(4);
+  s_left_sonar_2.read();
+  delay(4);
+  s_right_sonar_2.read();
 
   char text[256];
   // This format is currently used by the log-parser, so we need to keep it for now.
-  snprintf(text, sizeof(text), "%.3f m %.0f usec | %.3f m %.0f usec | %.1f degf %.0f",
-           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_right_sonar.distance(),
-           s_right_sonar.ping_usec(), s_shtc3.temperaturef(), s_light_sensor.value());
+  snprintf(text, sizeof(text),
+           "%.3f m %.0f usec, %.3f m %.0f usec "
+           "| %.3f m %.0f usec, %.3f m %.0f usec | %.1f degf %.0f",
+           s_left_sonar.distance(), s_left_sonar.ping_usec(), s_left_sonar_2.distance(),
+           s_left_sonar_2.ping_usec(), s_right_sonar.distance(), s_right_sonar.ping_usec(),
+           s_right_sonar_2.distance(), s_right_sonar_2.ping_usec(), s_shtc3.temperaturef(),
+           s_light_sensor.value());
   s_app.log().log(text);
 
   snprintf(text, sizeof(text), "L:%.2fm R:%.2fm\nT:%.1fF L:%.0f%%", s_left_sonar.distance(),
@@ -363,11 +435,14 @@ void update() {
 
   s_pir.read();
 
+  float right_dist2 = s_right_sonar_2.ok() ? s_right_sonar_2.distance() : -1.0f;
+  float left_dist2 = s_left_sonar_2.ok() ? s_left_sonar_2.distance() : -1.0f;
+
   if (s_right_sonar.ok()) {
-    s_right_classifier.setValue(s_right_sonar.distance());
+    s_right_classifier.setValue(s_right_sonar.distance(), right_dist2);
   }
   if (s_left_sonar.ok()) {
-    s_left_classifier.setValue(s_left_sonar.distance());
+    s_left_classifier.setValue(s_left_sonar.distance(), left_dist2);
   }
 
   const long now_msec = millis();
@@ -525,11 +600,13 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
   json["hardware"] = "Garage133";
 
   JsonObject garage = json["garage"].to<JsonObject>();
-  auto getState = [&garage](const char* label, Classifier& classifier, Sonar& sonar) {
+  auto getState = [&garage](const char* label, Classifier& classifier, Sonar& sonar1,
+                            Sonar& sonar2) {
     JsonObject state = garage[label].to<JsonObject>();
     state["open"] = classifier.doorOpen();
     state["car"] = classifier.carPresent();
-    state["dist"] = sonar.distance();
+    state["dist"] = sonar1.distance();
+    state["dist2"] = sonar2.distance();
     state["modelLoaded"] = classifier.isModelLoaded();
     state["currentState"] = classifier.currentState();
     JsonArray probs = state["probs"].to<JsonArray>();
@@ -537,8 +614,8 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
       probs.add(p);
     }
   };
-  getState("left", s_left_classifier, s_left_sonar);
-  getState("right", s_right_classifier, s_right_sonar);
+  getState("left", s_left_classifier, s_left_sonar, s_left_sonar_2);
+  getState("right", s_right_classifier, s_right_sonar, s_right_sonar_2);
 
   s_body.clear();
   serializeJson(jsondoc, s_body);

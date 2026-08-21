@@ -21,7 +21,7 @@ ORG = "Bailey Road"
 TOKEN = os.getenv("INFLUX_TOKEN")
 BUCKET = "garage"
 
-VALID_STATES = ["open", "closed_car", "closed_empty"]
+VALID_STATES = ["open", "closed_car", "closed_empty", "open_car", "open_empty"]
 
 
 def parse_time(time_str, tz="America/New_York") -> datetime:
@@ -60,9 +60,7 @@ def update_manifest(manifest_path, entry):
         manifest["episodes"] = []
 
     # Check for duplicates based on the filename
-    manifest["episodes"] = [
-        e for e in manifest["episodes"] if e.get("file") != entry.get("file")
-    ]
+    manifest["episodes"] = [e for e in manifest["episodes"] if e.get("file") != entry.get("file")]
     manifest["episodes"].append(entry)
 
     with manifest_path.open("w") as f:
@@ -114,7 +112,7 @@ def download_data(
             return
 
         # Clean up
-        cols_to_keep = ["_time", "left", "right"]
+        cols_to_keep = ["_time", "left", "right", "left_2", "right_2"]
         df = df[df.columns.intersection(cols_to_keep)]
         df.rename(columns={"_time": "time"}, inplace=True)
         df["time"] = pd.to_datetime(df["time"])
@@ -152,12 +150,8 @@ def main() -> bool:
         help="Start time (e.g., '2026-02-27 10:00:00')",
     )
     parser.add_argument("--end", type=str, help="End time")
-    parser.add_argument(
-        "-s", "--start-min", type=float, help="Start time in minutes before now"
-    )
-    parser.add_argument(
-        "-d", "--duration-min", type=float, help="Log duration in minutes"
-    )
+    parser.add_argument("-s", "--start-min", type=float, help="Start time in minutes before now")
+    parser.add_argument("-d", "--duration-min", type=float, help="Log duration in minutes")
     parser.add_argument(
         "--timezone",
         type=str,
@@ -204,9 +198,7 @@ def main() -> bool:
         choices=VALID_STATES,
         help="State to transition to for left",
     )
-    parser.add_argument(
-        "--right-trans-time", type=str, help="Transition time for right"
-    )
+    parser.add_argument("--right-trans-time", type=str, help="Transition time for right")
     parser.add_argument(
         "--right-trans-to",
         type=str,
@@ -274,18 +266,12 @@ def main() -> bool:
     }
 
     if left_trans_utc and args.left_trans_to:
-        labels["left"]["transitions"].append(
-            {"time": left_trans_utc, "to": args.left_trans_to}
-        )
+        labels["left"]["transitions"].append({"time": left_trans_utc, "to": args.left_trans_to})
 
     if right_trans_utc and args.right_trans_to:
-        labels["right"]["transitions"].append(
-            {"time": right_trans_utc, "to": args.right_trans_to}
-        )
+        labels["right"]["transitions"].append({"time": right_trans_utc, "to": args.right_trans_to})
 
-    download_data(
-        start_utc, end_utc, out_name, args.manifest, labels, root_dir=root_dir
-    )
+    download_data(start_utc, end_utc, out_name, args.manifest, labels, root_dir=root_dir)
     return True
 
 

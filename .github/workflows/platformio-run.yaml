@@ -21,7 +21,7 @@ jobs:
         run: pip install --upgrade platformio
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: svelte/package-lock.json
       - name: Install Svelte Dependencies

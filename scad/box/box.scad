@@ -24,25 +24,28 @@ outer_dims = (inner_dims
 	      + [2, 2, 0] * corner_radius);
 
 // cutout for oled screen
-oled_o = [16.5, 7];
+oled_o = [16.5, 8];
 oled_d = [12, 28];
-sonar_co_o = [34, 26];
-sonar_co_d = [15, 15];
-relay1_co_o = [48, 29];
-relay1_co_d = [10.5, 6.5];
+sonar_co1_o = [34, 26];
+sonar_co1_d = [15, 15];
+sonar_co2_o = [59, 26];
+sonar_co2_d = [15, 15];
+relay1_co_o = [48, 28.5];
+relay1_co_d = [11, 6.5];
 relay2_co_o = [49, 11.5];
 relay2_co_d = [9.5, 7];
 pirl_co_o = [45.8, 4];
 pirl_co_d = [13., 7];
 
 top_cutouts = [[oled_o, oled_d],
-	       [sonar_co_o, sonar_co_d],
+	       [sonar_co1_o, sonar_co1_d],
+	       [sonar_co2_o, sonar_co2_d],
 	       [relay1_co_o, relay1_co_d],
 	       [relay2_co_o, relay2_co_d],
 	       [pirl_co_o, pirl_co_d],
 	       ];
 
-usb_cutout = [[30, wall_thickness+space_below_board+board_thickness-1], [9.5, 3.5]];
+usb_cutout = [[45.7, wall_thickness+space_below_board+board_thickness-1], [9.5, 3.5]];
 yp_cutouts = [usb_cutout];
 
 // humps is a list of [offset-xy, outer_dims]
@@ -71,11 +74,13 @@ module Garage133_box(top) {
 		  yp_cutouts=yp_cutouts,
 		  corner_radius=corner_radius,
 		  humps=humps,
-		  top=top,
-		  screw_tab_d=10);
+		  top=top);
       if (top) {
 	in_Garage133_board_frame(board_height=true)
 	  shtc3_window(shtc3_loc, space_above_board+wall, wall, false, z_gap=-1);
+	screw_tab_d = 10;
+	translate([outer_dims[0]/2+15, outer_dims[1], 0])
+	  screw_tab(tab_width=screw_tab_d, thickness=2*wall, screw_radius=2);
       } else {
 	// Stuff to add on bottom.
 	in_Garage133_board_frame() {

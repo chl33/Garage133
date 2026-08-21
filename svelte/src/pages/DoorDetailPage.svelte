@@ -16,7 +16,12 @@
   let uploadMessage = '';
   let file = null;
 
-  const stateLabels = [
+  $: stateLabels = (doorData?.probs?.length === 4) ? [
+    { id: 0, label: 'Open (Car)', color: '#fef3c7' },
+    { id: 1, label: 'Open (Empty)', color: '#ffedd5' },
+    { id: 2, label: 'Closed (Car)', color: '#dcfce7' },
+    { id: 3, label: 'Closed (Empty)', color: '#eff6ff' }
+  ] : [
     { id: 0, label: 'Open', color: '#fef3c7' },
     { id: 1, label: 'Closed (Car)', color: '#dcfce7' },
     { id: 2, label: 'Closed (Empty)', color: '#eff6ff' }
@@ -119,7 +124,12 @@
           <div class="status-val" class:open={doorData?.open}>
             {doorData?.open ? 'OPEN' : 'CLOSED'}
           </div>
-          <div class="dist-val">{doorData?.dist?.toFixed(3) || '0.000'} meters</div>
+          {#if (doorData?.probs?.length === 4) || (doorData?.dist2 !== undefined && doorData?.dist2 >= 0)}
+            <div class="dist-val">Sonar 1 (Front): {doorData?.dist?.toFixed(3) || '0.000'} m</div>
+            <div class="dist-val">Sonar 2 (Rear): {doorData?.dist2?.toFixed(3) || '0.000'} m</div>
+          {:else}
+            <div class="dist-val">{doorData?.dist?.toFixed(3) || '0.000'} meters</div>
+          {/if}
         </div>
       </div>
 
