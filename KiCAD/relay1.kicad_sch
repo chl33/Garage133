@@ -1543,29 +1543,7 @@
 	)
 	(text "normally closed"
 		(exclude_from_sim no)
-		(at 99.06 137.795 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "39c0bf72-c21b-4026-98ca-3ab2f5e5119c")
-	)
-	(text "normally open"
-		(exclude_from_sim no)
-		(at 103.505 135.255 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "55632397-7e4f-4346-a8ae-10795f238d50")
-	)
-	(text "normally closed"
-		(exclude_from_sim no)
-		(at 95.885 59.69 90)
+		(at 95.758 57.15 90)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -1584,17 +1562,6 @@
 			(justify left bottom)
 		)
 		(uuid "a7114229-62e3-4f52-9553-e89b09b20f7f")
-	)
-	(text "common\n"
-		(exclude_from_sim no)
-		(at 100.965 163.83 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "d6c6d485-bfc0-4817-9461-e6b1a4bbbb83")
 	)
 	(text "common\n"
 		(exclude_from_sim no)
@@ -2283,7 +2250,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1980aad7-9b47-42af-bcae-1e1643f003aa")
-		(property "Reference" "#PWR026"
+		(property "Reference" "#PWR0102"
 			(at 80.01 113.03 0)
 			(effects
 				(font
@@ -2333,7 +2300,7 @@
 		(instances
 			(project "Garage133"
 				(path "/42347524-93c6-40af-953e-da6b7c7bdf56/d90cc7d4-8419-4d79-8cad-11316efa8615"
-					(reference "#PWR026")
+					(reference "#PWR0102")
 					(unit 1)
 				)
 			)
@@ -2466,12 +2433,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Sanyo SRD relay, Single Pole Miniature Power Relay,"
 			(at 95.25 146.05 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "5"
@@ -2542,12 +2510,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 69.85 49.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "2"
@@ -2611,12 +2580,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Sanyo SRD relay, Single Pole Miniature Power Relay,"
 			(at 92.71 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "5"
@@ -2915,12 +2885,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 55.88 41.91 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "2"
@@ -3012,7 +2983,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "a23a4d15-5880-4787-87f4-fdd3e9c734af")
 		(property "Reference" "Q3"
 			(at 88.9 48.2599 0)
@@ -3024,7 +2994,7 @@
 			)
 		)
 		(property "Value" "MMBT3906"
-			(at 88.9 50.7999 0)
+			(at 90.678 46.482 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3210,7 +3180,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 58.42 120.65 0)
 			(effects
 				(font
@@ -3279,12 +3249,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 45.72 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "2"
@@ -3461,7 +3432,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "cb83c45c-7d4d-48a7-b937-bf4248c7a2bb")
-		(property "Reference" "#PWR023"
+		(property "Reference" "#PWR0101"
 			(at 77.47 35.56 0)
 			(effects
 				(font
@@ -3511,7 +3482,7 @@
 		(instances
 			(project "Garage133"
 				(path "/42347524-93c6-40af-953e-da6b7c7bdf56/d90cc7d4-8419-4d79-8cad-11316efa8615"
-					(reference "#PWR023")
+					(reference "#PWR0101")
 					(unit 1)
 				)
 			)
@@ -3561,12 +3532,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 73.66 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "2"
@@ -3630,7 +3602,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Diode"
 			(at 74.93 66.04 0)
 			(effects
 				(font
@@ -3722,6 +3694,7 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Sim.Pins" "1=K 2=A"
@@ -3794,12 +3767,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Resistor"
 			(at 48.26 160.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(pin "2"
@@ -3863,12 +3837,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Diode"
 			(at 77.47 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Sim.Device" "D"
