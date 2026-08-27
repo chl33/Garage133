@@ -427,11 +427,11 @@ void update() {
   s_left_sonar_2.setTemp(s_shtc3.temperature());
 
   s_left_sonar.read();
-  delay(10);  // Wait a short (2msec) time between sonar readings.
+  delay(2);  // Wait a short (2msec) time between sonar readings.
   s_right_sonar.read();
-  delay(10);
+  delay(2);
   s_left_sonar_2.read();
-  delay(10);
+  delay(2);
   s_right_sonar_2.read();
 
   char text[256];
