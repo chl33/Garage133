@@ -14,7 +14,7 @@ gap = 0.2;
 corner_radius = 2;
 
 mount_offset = pad_space;
-space_above_board = 3;
+space_above_board = 4;
 space_below_board = 3;
 inner_dims = (board_dims
 	      + Z*(space_above_board+space_below_board)
@@ -93,8 +93,8 @@ module Garage133_box(top) {
       // usb
       translate([27.9,
 		 outer_dims[1]-wall_thickness-1,
-		 wall_thickness+space_below_board+board_thickness-1])
-	cube([11, wall_thickness+2, 4]);
+		 wall_thickness+space_below_board+board_thickness-2])
+	cube([11, wall_thickness+2, 6]);
     }
   }
 }
