@@ -14,7 +14,7 @@ gap = 0.2;
 corner_radius = 2;
 
 mount_offset = pad_space;
-space_above_board = 2;
+space_above_board = 4;
 space_below_board = 3;
 inner_dims = (board_dims
 	      + Z*(space_above_board+space_below_board)
@@ -24,36 +24,28 @@ outer_dims = (inner_dims
 	      + [2, 2, 0] * corner_radius);
 
 // cutout for oled screen
-oled_o = [16.5, 8];
+oled_o = [15.5, 8];
 oled_d = [12, 28];
-sonar_co1_o = [34, 26];
-sonar_co1_d = [15, 15];
-sonar_co2_o = [59, 26];
-sonar_co2_d = [15, 15];
-relay1_co_o = [48, 28.5];
-relay1_co_d = [11, 6.5];
-relay2_co_o = [49, 11.5];
-relay2_co_d = [9.5, 7];
-pirl_co_o = [45.8, 4];
-pirl_co_d = [13., 7];
+sonar_co1_o = [39.5, 26];
+sonar_co1_d = [29, 17];
+relay1_co_o = [29.5, 3];
+relay1_co_d = [33, 7];
 
-top_cutouts = [[oled_o, oled_d],
-	       [sonar_co1_o, sonar_co1_d],
-	       [sonar_co2_o, sonar_co2_d],
-	       [relay1_co_o, relay1_co_d],
-	       [relay2_co_o, relay2_co_d],
-	       [pirl_co_o, pirl_co_d],
+top_cutouts = [[sonar_co1_o, sonar_co1_d],
+       	       [relay1_co_o, relay1_co_d],
 	       ];
 
-usb_cutout = [[45.7, wall_thickness+space_below_board+board_thickness-1], [9.5, 3.5]];
-yp_cutouts = [usb_cutout];
+//usb_cutout = [[63, wall_thickness+space_below_board+board_thickness-1], [9.5, 3.5]];
+//yp_cutouts = [usb_cutout];
+
+oled_off = [13.5, 0, outer_dims[2]-wall_thickness];
+oled_out = [15.5, outer_dims[1], 10];
+oled_inn = oled_out - wall_thickness * [2, 2, 1];
 
 // humps is a list of [offset-xy, outer_dims]
-oled_ho = [14, 0];
-oled_hd = [17, outer_dims[1], 12];
 relay_hd = [30, outer_dims[1], 14];
 relay_ho = [outer_dims[0]-relay_hd[0], 0];
-humps = [[oled_ho, oled_hd], [relay_ho, relay_hd]];
+humps = [[relay_ho, relay_hd]];
 
 module in_Garage133_board_frame(board_height=false) {
   zoffset = wall_thickness + (board_height ? space_below_board + 2*gap + board_thickness : 0);
@@ -71,11 +63,12 @@ module Garage133_box(top) {
 		  gap=gap,
 		  snaps_on_sides=true,
 		  top_cutouts=top_cutouts,
-		  yp_cutouts=yp_cutouts,
 		  corner_radius=corner_radius,
 		  humps=humps,
 		  top=top);
       if (top) {
+	translate(oled_off) cube(oled_out);
+	// oled_inn
 	in_Garage133_board_frame(board_height=true)
 	  shtc3_window(shtc3_loc, space_above_board+wall, wall, false, z_gap=-1);
 	screw_tab_d = 10;
@@ -93,8 +86,15 @@ module Garage133_box(top) {
     }
     // Cut outs.
     if (top) {
+      translate(oled_off + wall_thickness * [1, 1, -0.001]) cube(oled_inn);
+      translate(oled_off + [2, 9, oled_inn[2]-0.01]) cube([12, 29, wall_thickness+2]);
       in_Garage133_board_frame(board_height=true)
 	shtc3_window(shtc3_loc, space_above_board+wall, wall, true, z_gap=-1);
+      // usb
+      translate([27.9,
+		 outer_dims[1]-wall_thickness-1,
+		 wall_thickness+space_below_board+board_thickness-2])
+	cube([11, wall_thickness+2, 6]);
     }
   }
 }
