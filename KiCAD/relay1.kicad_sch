@@ -2764,7 +2764,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "MMBT3906"
+		(property "Value" "MMBT4403"
 			(at 92.71 129.5399 0)
 			(effects
 				(font
@@ -2993,7 +2993,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "MMBT3906"
+		(property "Value" "MMBT4403"
 			(at 90.678 46.482 90)
 			(effects
 				(font
@@ -3564,7 +3564,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "e191fae6-bb74-4e4d-9294-44748bd04d24")
 		(property "Reference" "D1"
 			(at 77.47 64.77 90)
@@ -3575,8 +3574,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "D"
-			(at 77.47 67.31 90)
+		(property "Value" "B5817WS-TP"
+			(at 72.39 59.944 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3799,7 +3798,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "f04bb66a-62c4-49fe-82f6-805fe87f2aab")
 		(property "Reference" "D2"
 			(at 80.01 142.24 90)
@@ -3810,8 +3808,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "D"
-			(at 80.01 144.78 90)
+		(property "Value" "B5817WS-TP"
+			(at 74.93 136.906 0)
 			(effects
 				(font
 					(size 1.27 1.27)
