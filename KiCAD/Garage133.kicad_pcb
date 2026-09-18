@@ -2723,14 +2723,14 @@
 			)
 		)
 		(pad "" smd roundrect
-			(at -1.025 -0.5 270)
+			(at -0.93 -0.5 270)
 			(size 0.55 0.35)
 			(layers "F.Paste")
 			(roundrect_rratio 0.25)
 			(uuid "fc133348-544a-4937-a7a6-970a8a140aaf")
 		)
 		(pad "" smd roundrect
-			(at -1.025 0.5 270)
+			(at -0.93 0.5 270)
 			(size 0.55 0.35)
 			(layers "F.Paste")
 			(roundrect_rratio 0.25)
@@ -2744,14 +2744,14 @@
 			(uuid "abfecca4-6d2d-431c-bbd8-ebe61472009c")
 		)
 		(pad "" smd roundrect
-			(at 1.025 -0.5 90)
+			(at 0.93 -0.5 90)
 			(size 0.55 0.35)
 			(layers "F.Paste")
 			(roundrect_rratio 0.25)
 			(uuid "35647f5b-ca3c-40b2-b004-145fda041ec3")
 		)
 		(pad "" smd roundrect
-			(at 1.025 0.5 90)
+			(at 0.93 0.49 90)
 			(size 0.55 0.35)
 			(layers "F.Paste")
 			(roundrect_rratio 0.25)

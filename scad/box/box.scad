@@ -26,10 +26,10 @@ outer_dims = (inner_dims
 // cutout for oled screen
 oled_o = [15.5, 8];
 oled_d = [12, 28];
-sonar_co1_o = [39.5, 26];
+sonar_co1_o = [39.5, 25];
 sonar_co1_d = [29, 17];
-relay1_co_o = [29.5, 3];
-relay1_co_d = [33, 7];
+relay1_co_o = [34.5, 2.5];
+relay1_co_d = [33.5, 7];
 
 top_cutouts = [[sonar_co1_o, sonar_co1_d],
        	       [relay1_co_o, relay1_co_d],
@@ -38,13 +38,19 @@ top_cutouts = [[sonar_co1_o, sonar_co1_d],
 //usb_cutout = [[63, wall_thickness+space_below_board+board_thickness-1], [9.5, 3.5]];
 //yp_cutouts = [usb_cutout];
 
+shtc3_co_len = 4;
+shtc3_co = [[(outer_dims[1]-shtc3_co_len)/2-2.5, space_below_board + board_thickness],
+	    [shtc3_co_len, 2]];
+//xp_cutouts = [shtc3_co];
+
 oled_off = [13.5, 0, outer_dims[2]-wall_thickness];
 oled_out = [15.5, outer_dims[1], 10];
 oled_inn = oled_out - wall_thickness * [2, 2, 1];
 
 // humps is a list of [offset-xy, outer_dims]
-relay_hd = [30, outer_dims[1], 14];
-relay_ho = [outer_dims[0]-relay_hd[0], 0];
+relay_end_offset = 4;
+relay_hd = [30-relay_end_offset, outer_dims[1], 14];
+relay_ho = [outer_dims[0]-relay_hd[0]-relay_end_offset, 0];
 humps = [[relay_ho, relay_hd]];
 
 module in_Garage133_board_frame(board_height=false) {
@@ -95,6 +101,15 @@ module Garage133_box(top) {
 		 outer_dims[1]-wall_thickness-1,
 		 wall_thickness+space_below_board+board_thickness-2])
 	cube([11, wall_thickness+2, 6]);
+      
+      translate([outer_dims[0], 0, 0])
+	rotate(90, [0, 0, 1])
+	rotate(90, [1, 0, 0]) {
+	offset = shtc3_co[0];
+	size = shtc3_co[1];
+	translate([offset[0], offset[1], -2*wall])
+	  cube([size[0], size[1], 3*wall]);
+      }
     }
   }
 }
