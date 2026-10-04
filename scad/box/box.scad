@@ -88,7 +88,7 @@ module Garage133_box(top) {
 	  screw_tab(tab_width=screw_tab_d, thickness=2*wall, screw_radius=2);
 
 	// Raised lettering
-	translate([0, 0, outer_dims[2]+main_hump_above_board-epsilon]) {
+	translate([0, 0, outer_dims[2]+main_hump_above_board-wall-epsilon]) {
 	  translate([8, 9, 0]) rotate([0, 0, 90]) write(0, 0, "Garage133");
 	  translate([sonar_co1_o[0] - 6, sonar_co1_o[1]+11, 0]) {
 	    write(0, 0, "L");
