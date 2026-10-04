@@ -100,8 +100,8 @@ module Garage133_box(top) {
 	  }
 	  translate([relay1_co_o[0]+ 1, relay1_co_o[1]+8, 0]) {
 	    write(0, 0, "PIRL");
-	    write(15, 0, "FT");
-	    write(25, 0, "BK");
+	    write(17, 0, "L");
+	    write(26, 0, "R");
 	  }
 	}
 
