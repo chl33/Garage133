@@ -22,3 +22,7 @@ secrets*.yaml
 /.cache/
 /compile_commands.json
 /svelte/.vite/
+/KiCAD/Garage133-drc.rpt
+/KiCAD/Garage133-erc.rpt
+/KiCAD/Garage133-test.pdf
+/KiCAD/page*.png

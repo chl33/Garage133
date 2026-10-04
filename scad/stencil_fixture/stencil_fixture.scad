@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Chris Lee and contributors.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+show_vitamins = true;
 
 // pin_mask bits:
 //   0x1: bottom left
@@ -49,17 +50,18 @@ module stencil(board_dims_xy, dscrew, screw_offset, board_stl_file,
   }
   translate([0, 0, base_thickness - 0.01 ]) {
     $fn = 20;
+    offset = screw_offset + space;
     if (pin_mask & 0x1) { // bottom left
-      peg([screw_offset, screw_offset, 0 ]);
+      peg([offset, offset, 0 ]);
     }
     if (pin_mask & 0x2) { // bottom right
-      peg([board_dims[0] - screw_offset, screw_offset, 0 ]);
+      peg([board_dims[0] - offset, offset, 0 ]);
     }
     if (pin_mask & 0x4) { // top right
-      peg([board_dims[0] - screw_offset, board_dims[1] - screw_offset, 0 ]);
+      peg([board_dims[0] - offset, board_dims[1] - offset, 0 ]);
     }
     if (pin_mask & 0x8) { // top_left
-      peg([screw_offset, board_dims[1] - screw_offset, 0 ]);
+      peg([offset, board_dims[1] - screw_offset, 0 ]);
     }
     for (pin_offset = extra_pins) {
       peg([pin_offset[0], pin_offset[1], 0 ]);
@@ -70,14 +72,14 @@ module stencil(board_dims_xy, dscrew, screw_offset, board_stl_file,
 // Screw diameter (M2.5)
 dscrew = 2.5;
 // x/y offset between edge of board and middle of peg to align board and stencil.
-screw_offset = 2.5;
-// pin_mask = 0x1+0x4: bottom left, top right
-pin_mask = 0x6;
+screw_offset = 2.54;
+pin_mask = 0x2; // bottom right
 
 
-board_stl_file = "../../KiCAD/Garage133.stl";
-board_xy = [ 97.79, 39.37 ];
+board_stl_file = show_vitamins ? "../../KiCAD/Garage133.stl" : undef;
+board_xy = [ 93.345, 39.37 ];  // 36.75u x 15.5u
 pad = 2.54;
+// top left pin from top corner of board: 9.525, 2.54 = 3.75, 1
 extra_pins = [[pad*3.75, board_xy[1]-screw_offset]];
 stencil(board_xy, dscrew, screw_offset, board_stl_file = board_stl_file,
 	pin_mask=pin_mask, extra_pins=extra_pins);

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-08-21
+
+### Added
+- **Hardware Board v3.0 & ESP32-S3 Support**: Added PlatformIO configuration (`usb_s3`), pin assignments for ESP32-S3, updated schematic/PCB designs, and refreshed solder stencil fixture 3D models.
+- **Quad-Sonar Support**: Integrated dual ultrasonic sensors per side (4 total) with updated state classification logic, training pipeline, and retrained HMM models.
+- **Home Assistant Probability Export**: Exported garage state probabilities (`probOpen`, `probCar`, `probEmpty`) via Home Assistant MQTT discovery.
+
+### Changed
+- **Svelte Build Tooling**: Pinned `svelteesp32` to v3.2.5 and updated CI workflows to Node 22 for reproducible builds.
+- **Dependency & Workflow Upgrades**: Upgraded `og3` to v0.6.3, `og3x-oled` to v0.6.1, and updated GitHub Actions workflows to latest versions.
+
 ## [1.0.3] - 2026-03-24
 
 ### Added
