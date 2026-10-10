@@ -65,7 +65,7 @@ This repository includes files for fabricating the custom PCB and 3D printed cas
 *   **KiCAD:** Circuit board schematics and layouts are located in the `KiCAD/` directory.
 *   **3D Parts:** OpenSCAD and STL files for the enclosure, sensor mounts, and solder stencil fixtures are in the `scad/` directory.
 
-![Garage133 board](images/garage133-board-1400x728.webp)
+![Garage133 board](images/garage133-pcba-v31.webp)
 ![Sonar sensor](images/sonar-mounted-1400x1054.webp)
 
 Sonar sensor mount design is also [published on Printables](https://www.printables.com/model/1741349-sonar-ball-and-socket-mount).
