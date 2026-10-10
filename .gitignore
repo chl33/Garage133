@@ -26,3 +26,4 @@ secrets*.yaml
 /KiCAD/Garage133-erc.rpt
 /KiCAD/Garage133-test.pdf
 /KiCAD/page*.png
+/analysis/training/Good/
