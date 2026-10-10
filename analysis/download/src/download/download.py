@@ -182,28 +182,14 @@ def main() -> bool:
         type=str,
         choices=VALID_STATES,
         required=True,
-        help="Initial state for left",
+        help="State for left",
     )
     parser.add_argument(
         "--right-state",
         type=str,
         choices=VALID_STATES,
         required=True,
-        help="Initial state for right",
-    )
-    parser.add_argument("--left-trans-time", type=str, help="Transition time for left")
-    parser.add_argument(
-        "--left-trans-to",
-        type=str,
-        choices=VALID_STATES,
-        help="State to transition to for left",
-    )
-    parser.add_argument("--right-trans-time", type=str, help="Transition time for right")
-    parser.add_argument(
-        "--right-trans-to",
-        type=str,
-        choices=VALID_STATES,
-        help="State to transition to for right",
+        help="State for right",
     )
 
     args = parser.parse_args()
@@ -243,33 +229,16 @@ def main() -> bool:
         print(f"Error: Output file '{output_full_path}' already exists.")
         return False
 
-    left_trans_utc = parse_time(args.left_trans_time, args.timezone)
-    right_trans_utc = parse_time(args.right_trans_time, args.timezone)
-
     # 3. Validation
     if start_utc >= end_utc:
         print(f"Error: Start time ({start_utc}) must be before end time ({end_utc}).")
         return False
 
-    if left_trans_utc and not (start_utc <= left_trans_utc <= end_utc):
-        print(f"Error: Left transition time ({left_trans_utc}) is outside range.")
-        return False
-
-    if right_trans_utc and not (start_utc <= right_trans_utc <= end_utc):
-        print(f"Error: Right transition time ({right_trans_utc}) is outside range.")
-        return False
-
     # Build labels
     labels = {
-        "left": {"initial_state": args.left_state, "transitions": []},
-        "right": {"initial_state": args.right_state, "transitions": []},
+        "left": {"state": args.left_state},
+        "right": {"state": args.right_state},
     }
-
-    if left_trans_utc and args.left_trans_to:
-        labels["left"]["transitions"].append({"time": left_trans_utc, "to": args.left_trans_to})
-
-    if right_trans_utc and args.right_trans_to:
-        labels["right"]["transitions"].append({"time": right_trans_utc, "to": args.right_trans_to})
 
     download_data(start_utc, end_utc, out_name, args.manifest, labels, root_dir=root_dir)
     return True
