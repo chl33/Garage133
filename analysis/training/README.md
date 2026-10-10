@@ -65,6 +65,22 @@ poetry run python src/training/test_hmm.py --model-dir . --manifest ../sonar_dat
 *   **Accuracy**: The percentage of sonar samples correctly classified.
 *   **Confusion Matrix**: Rows represent the actual steady state (Ground Truth), and columns represent what the HMM predicted.
 
+### Model Visualization (SVG Generation)
+
+Generate scalable vector diagrams showing the state transition topology and distance emission histograms:
+
+```bash
+# Generate SVGs for both hmm_left.json and hmm_right.json
+./visualize_hmm.sh
+
+# Or for a specific model JSON file:
+poetry run python src/training/visualize_hmm.py hmm_left.json -o hmm_left.svg
+```
+
+The resulting SVGs illustrate:
+1. **State Transition Topology**: Directed graph of states, transition probabilities $A_{ij}$, stay probabilities, and initial priors $\pi_i$.
+2. **Emission Profiles**: Histograms of distance readings $P(\text{dist} \mid \text{state})$ for each state, comparing Sonar 1 and Sonar 2 distributions across distance buckets (0–400cm).
+
 ## Data Organization
 
 The trainer expects a `manifest.yaml` file pointing to CSV files containing sonar data. Use `interactive.py` or `./interactive.sh` to download and label steady-state garage episodes without state transitions.
