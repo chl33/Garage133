@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-14
+
+### Added
+- **Hardware Board v3.1 & Enclosure Updates**: KiCAD PCB updates for board v3.1 with revised BOM, updated 3D printable enclosure (better SHTC3 thermal isolation, labeled connectors, improved USB-C port clearance), and solder stencil support frame model.
+- **HMM Visualization & Retraining Workflow**: Added `analysis/hmm_to_svg.py` to generate SVG state transition diagrams from trained HMM models, and added characterization workflow in `analysis/retrain.py`.
+
+### Changed
+- **Sonar Watchdog & Timeout Stability**: Added sonar ping timeout handling to prevent blocking pulses from triggering the ESP32 hardware watchdog.
+- **Dependency Upgrades**: Upgraded `og3` to v0.7.0.
+
 ## [2.0.0] - 2026-08-21
 
 ### Added

@@ -11,6 +11,13 @@ The system integrates seamlessly with **Home Assistant** via MQTT Discovery
 
 ![Garage133](images/garage133-1400x600.webp)
 
+## What's New in v2.1.0
+
+*   **Board v3.1 PCB & Enclosure Updates**: Updated KiCAD design for board v3.1, refined BOM, and enhanced 3D-printed enclosure with labeled connectors, improved USB-C port clearance, and better thermal isolation for the SHTC3 sensor.
+*   **Sonar Watchdog & Stability**: Added sonar ping timeout handling to prevent missed echoes from triggering the ESP32 hardware watchdog.
+*   **HMM Visualization & Retraining Tools**: Added an SVG state diagram visualization tool (`analysis/hmm_to_svg.py`) and streamlined characterization workflow in `analysis/retrain.py`.
+*   **Framework Upgrade**: Upgraded to **og3 v0.7.0**.
+
 ## What's New in v2.0.0
 
 *   **Quad-Sonar Array (Dual Sonars per Bay)**: Upgraded from single to dual HC-SR04 ultrasonic sensors per garage door (4 sonars total), providing substantially more robust vehicle detection and door state estimation.
@@ -41,7 +48,7 @@ The system integrates seamlessly with **Home Assistant** via MQTT Discovery
 
 ## Hardware
 
-Garage133 supports both the **Board v3.0 (ESP32-S3)** and legacy/updated **Board v1/v2 (Classic ESP32)**.
+Garage133 supports both the **Board v3.1 / v3.0 (ESP32-S3)** and legacy/updated **Board v1/v2 (Classic ESP32)**.
 
 ### Pinout Configuration
 

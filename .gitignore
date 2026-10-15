@@ -27,3 +27,9 @@ secrets*.yaml
 /KiCAD/Garage133-test.pdf
 /KiCAD/page*.png
 /analysis/training/Good/
+/analysis/sonar_data_*/
+/analysis/sonar_data_bad/
+/analysis/training/hmms*/
+/analysis/download*.sh
+/analysis/ha_download/
+hardware_recommendations.md
