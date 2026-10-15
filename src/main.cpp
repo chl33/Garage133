@@ -35,7 +35,6 @@ static const char kSoftware[] = "Garage133 v" VERSION;
 
 // --- Garage133 Hardware Configuration ---
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_USB_MODE)
 // ESP32-S3 Pin Assignments
 const int kRelayLeftPin = 10;   // RELAY_CMD1
 const int kRelayRightPin = 11;  // RELAY_CMD2
@@ -52,24 +51,6 @@ const int kRightEcho2Pin = 15;  // ECHO4
 
 const int kPirPin = 12;         // AL
 const int kLightPin = 12;       // AL
-#else
-// Classic ESP32 Pin Assignments
-const int kRelayLeftPin = 4;
-const int kRelayRightPin = 19;
-
-const int kLeftTrigPin = 16;
-const int kLeftEchoPin = 17;
-const int kRightTrigPin = 5;
-const int kRightEchoPin = 18;
-
-const int kLeftTrig2Pin = 23;
-const int kLeftEcho2Pin = 26;
-const int kRightTrig2Pin = 27;
-const int kRightEcho2Pin = 32;
-
-const int kPirPin = 25;
-const int kLightPin = 33;
-#endif
 
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
 constexpr App::LogType kLogType = App::LogType::kUdp;

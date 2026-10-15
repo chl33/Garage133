@@ -14,9 +14,10 @@ The system integrates seamlessly with **Home Assistant** via MQTT Discovery
 ## What's New in v2.1.0
 
 *   **Board v3.1 PCB & Enclosure Updates**: Updated KiCAD design for board v3.1, refined BOM, and enhanced 3D-printed enclosure with labeled connectors, improved USB-C port clearance, and better thermal isolation for the SHTC3 sensor.
+*   **Standardized on ESP32-S3 (Board v3.x)**: Retired support and pin definitions for legacy Classic ESP32 (Board v1/v2).
 *   **Sonar Watchdog & Stability**: Added sonar ping timeout handling to prevent missed echoes from triggering the ESP32 hardware watchdog.
 *   **HMM Visualization & Retraining Tools**: Added an SVG state diagram visualization tool (`analysis/hmm_to_svg.py`) and streamlined characterization workflow in `analysis/retrain.py`.
-*   **Framework Upgrade**: Upgraded to **og3 v0.7.0**.
+*   **Published Library Dependencies**: Switched dependency management to published packages (`chl33/og3@^0.7.0`, `chl33/og3x-oled@^0.6.1`, `chl33/og3x-shtc3@^0.6.0`).
 
 ## What's New in v2.0.0
 
@@ -48,21 +49,21 @@ The system integrates seamlessly with **Home Assistant** via MQTT Discovery
 
 ## Hardware
 
-Garage133 supports both the **Board v3.1 / v3.0 (ESP32-S3)** and legacy/updated **Board v1/v2 (Classic ESP32)**.
+Garage133 is designed for the **Board v3.1 / v3.0 (ESP32-S3)**. Earlier Board v1/v2 (Classic ESP32) revisions have been retired.
 
 ### Pinout Configuration
 
-| Component | Board v3.0 (ESP32-S3) | Board v1/v2 (Classic ESP32) | Description |
-| :--- | :--- | :--- | :--- |
-| **Relay (Left)** | GPIO 10 | GPIO 4 | Left Garage Door Relay Command |
-| **Relay (Right)** | GPIO 11 | GPIO 19 | Right Garage Door Relay Command |
-| **Sonar 1 Trig / Echo (Left)** | GPIO 1 / GPIO 5 | GPIO 16 / GPIO 17 | Primary Left Ultrasonic Sensor |
-| **Sonar 2 Trig / Echo (Left)** | GPIO 3 / GPIO 7 | GPIO 23 / GPIO 26 | Secondary Left Ultrasonic Sensor |
-| **Sonar 1 Trig / Echo (Right)** | GPIO 2 / GPIO 6 | GPIO 5 / GPIO 18 | Primary Right Ultrasonic Sensor |
-| **Sonar 2 Trig / Echo (Right)** | GPIO 4 / GPIO 15 | GPIO 27 / GPIO 32 | Secondary Right Ultrasonic Sensor |
-| **PIR Sensor** | GPIO 12 | GPIO 25 | PIR Motion Detection |
-| **Light Sensor** | GPIO 12 | GPIO 33 | Analog Light Level |
-| **I2C SDA / SCL** | GPIO 8 / GPIO 9 | GPIO 21 / GPIO 22 | SHTC3 Sensor & OLED Display |
+| Component | Board v3.1 / v3.0 (ESP32-S3) | Description |
+| :--- | :--- | :--- |
+| **Relay (Left)** | GPIO 10 | Left Garage Door Relay Command |
+| **Relay (Right)** | GPIO 11 | Right Garage Door Relay Command |
+| **Sonar 1 Trig / Echo (Left)** | GPIO 1 / GPIO 5 | Primary Left Ultrasonic Sensor |
+| **Sonar 2 Trig / Echo (Left)** | GPIO 3 / GPIO 7 | Secondary Left Ultrasonic Sensor |
+| **Sonar 1 Trig / Echo (Right)** | GPIO 2 / GPIO 6 | Primary Right Ultrasonic Sensor |
+| **Sonar 2 Trig / Echo (Right)** | GPIO 4 / GPIO 15 | Secondary Right Ultrasonic Sensor |
+| **PIR Sensor** | GPIO 12 | PIR Motion Detection |
+| **Light Sensor** | GPIO 12 | Analog Light Level |
+| **I2C SDA / SCL** | GPIO 8 / GPIO 9 | SHTC3 Sensor & OLED Display |
 
 *Note: Pin definitions are configured in [`src/main.cpp`](file:///home/chris/Projects2/Garage133/src/main.cpp).*
 
@@ -109,17 +110,13 @@ Sonar sensor mount design is also [published on Printables](https://www.printabl
 4.  **Build and Flash:**
     Connect your board via USB for the initial flash:
 
-    *   **For ESP32-S3 (Board v3.0):**
+    *   **USB Flash (ESP32-S3):**
         ```bash
         pio run -e usb_s3 --target upload
         ```
-    *   **For Classic ESP32 (Board v1/v2):**
+    *   **OTA Updates (once configured on WiFi):**
         ```bash
-        pio run -e usb_node32s --target upload
-        ```
-    *   **For OTA updates (once configured on WiFi):**
-        ```bash
-        pio run -e wifi_node32s --target upload
+        pio run -e wifi_s3 --target upload
         ```
 
 ## Usage
