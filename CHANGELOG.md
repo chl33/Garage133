@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Sonar Watchdog & Timeout Stability**: Added sonar ping timeout handling to prevent blocking pulses from triggering the ESP32 hardware watchdog.
-- **Dependency Upgrades**: Switched from local symlinks to published registry packages: `chl33/og3@^0.7.0`, `chl33/og3x-oled@^0.6.1`, and `chl33/og3x-shtc3@^0.6.0`.
 
 ### Removed
 - **Retired Legacy Hardware**: Removed firmware and PlatformIO configuration support for legacy Classic ESP32 boards (Board v1/v2 / `node32s`), focusing entirely on Board v3.x (ESP32-S3).
