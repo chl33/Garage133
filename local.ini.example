@@ -1,5 +1,5 @@
 [platformio]
-default_envs = usb_node32s
+default_envs = usb_s3
 
 [local]
 build_flags =

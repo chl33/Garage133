@@ -116,15 +116,14 @@ def interactive_session(date_str, timezone, root_dir):
     t_max = time_nums.max()
 
     # 3. Plot and let the user interact
-    print("\n--- Visual Labeling Mode ---")
+    print("\n--- Visual Trimming Mode ---")
     print("Selection Flow:")
-    print("1. Start Trim | 2. End Trim | 3. Left Transition | 4. Right Transition")
+    print("1. Start Trim | 2. End Trim")
     print("\nControls:")
-    print("- CLICK: Select point (ignored if Zoom/Pan tool is active)")
-    print("- CLICK OUTSIDE DATA: Skip a transition point")
-    msg = "- TOOLBAR: Use Zoom/Pan investigate, then toggle them OFF to select"
+    print("- CLICK: Select trim point (ignored if Zoom/Pan tool is active)")
+    msg = "- TOOLBAR: Use Zoom/Pan to investigate, then toggle them OFF to select"
     print(msg)
-    print("- CLOSE WINDOW: Finish early with selected points")
+    print("- Window closes automatically after selecting start and end trim points")
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(df["time"], df["left"], label="Left Sonar 1", marker=".", markersize=2)
@@ -154,20 +153,14 @@ def interactive_session(date_str, timezone, root_dir):
 
     # Selection state
     clicks = []
-    labels = ["Start Trim", "End Trim", "Left Transition", "Right Transition"]
+    labels = ["Start Trim", "End Trim"]
 
     def on_click(event):
-        if len(clicks) >= 4:
+        if len(clicks) >= 2:
             return
 
         # Check if click is on the plot area
         if event.inaxes != ax:
-            # If we already have trim points, allow clicking outside to skip transitions
-            if len(clicks) >= 2:
-                print(f"Skipped {labels[len(clicks)]} (clicked outside axes)")
-                clicks.append(None)
-                if len(clicks) == 4:
-                    plt.close()
             return
 
         # CRITICAL: Ignore clicks if the Zoom or Pan tools are active
@@ -176,13 +169,9 @@ def interactive_session(date_str, timezone, root_dir):
 
         # Check if click is within the data's time range
         if event.xdata < t_min or event.xdata > t_max:
-            if len(clicks) >= 2:
-                print(f"Skipped {labels[len(clicks)]} (clicked outside data range)")
-                clicks.append(None)
-            else:
-                msg = f"Ignored click outside data range for {labels[len(clicks)]}"
-                print(msg)
-                return
+            msg = f"Ignored click outside data range for {labels[len(clicks)]}"
+            print(msg)
+            return
         else:
             dt = mdates.num2date(event.xdata).replace(tzinfo=None)
             ts = pd.Timestamp(dt).tz_localize("UTC")
@@ -192,7 +181,7 @@ def interactive_session(date_str, timezone, root_dir):
             ax.axvline(x=event.xdata, color="r", linestyle="--", alpha=0.5)
             plt.draw()
 
-        if len(clicks) == 4:
+        if len(clicks) == 2:
             plt.close()
 
     fig.canvas.mpl_connect("button_press_event", on_click)
@@ -202,10 +191,7 @@ def interactive_session(date_str, timezone, root_dir):
         print("Need at least start and end trim points. Aborting.")
         return
 
-    trim_start = clicks[0]
-    trim_end = clicks[1]
-    left_trans = clicks[2] if len(clicks) >= 3 else None
-    right_trans = clicks[3] if len(clicks) >= 4 else None
+    trim_start, trim_end = sorted([clicks[0], clicks[1]])
 
     # 4. Final Metadata Gathering in Terminal
     print("\n--- Episode Metadata ---")
@@ -215,45 +201,21 @@ def interactive_session(date_str, timezone, root_dir):
         print("Aborting session. Data not saved.")
         return
 
-    left_initial = get_state_input("Left Initial State", "e")
-    if left_initial == "q":
+    left_state = get_state_input("Left State", "e")
+    if left_state == "q":
         print("Aborting session. Data not saved.")
         return
 
-    left_to = None
-    if left_trans is not None:
-        left_to = get_state_input("Left Transition To", "o")
-        if left_to == "q":
-            print("Aborting session. Data not saved.")
-            return
-
-    right_initial = get_state_input("Right Initial State", "e")
-    if right_initial == "q":
+    right_state = get_state_input("Right State", "e")
+    if right_state == "q":
         print("Aborting session. Data not saved.")
         return
-
-    right_to = None
-    if right_trans is not None:
-        right_to = get_state_input("Right Transition To", "o")
-        if right_to == "q":
-            print("Aborting session. Data not saved.")
-            return
 
     # 5. Save the final trimmed data and update manifest
     episode_labels = {
-        "left": {"initial_state": left_initial, "transitions": []},
-        "right": {"initial_state": right_initial, "transitions": []},
+        "left": {"state": left_state},
+        "right": {"state": right_state},
     }
-
-    if left_trans is not None and left_to is not None and left_to != left_initial:
-        episode_labels["left"]["transitions"].append(
-            {"time": left_trans.strftime("%Y-%m-%dT%H:%M:%SZ"), "to": left_to}
-        )
-
-    if right_trans is not None and right_to is not None and right_to != right_initial:
-        episode_labels["right"]["transitions"].append(
-            {"time": right_trans.strftime("%Y-%m-%dT%H:%M:%SZ"), "to": right_to}
-        )
 
     print(f"\nSaving final trimmed data: {output_name}")
     download_data(
