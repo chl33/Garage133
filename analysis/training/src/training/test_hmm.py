@@ -60,21 +60,11 @@ class HMMEngine:
 
 
 def get_ground_truth(df, side_info, state_names):
-    states = []
-    current_state = side_info["initial_state"]
     state_to_idx = {s: i for i, s in enumerate(state_names)}
-    trans_list = side_info.get("transitions", [])
-    transitions = sorted(trans_list, key=lambda x: x["time"])
-    trans_idx = 0
-    for _, row in df.iterrows():
-        if trans_idx < len(transitions):
-            t_str = transitions[trans_idx]["time"]
-            trans_time = pd.to_datetime(t_str, format="ISO8601")
-            if row["time"] >= trans_time:
-                current_state = transitions[trans_idx]["to"]
-                trans_idx += 1
-        states.append(state_to_idx[current_state])
-    return np.array(states)
+    state = side_info.get("state") or side_info.get("initial_state")
+    if not state or state not in state_to_idx:
+        return np.array([])
+    return np.full(len(df), state_to_idx[state])
 
 
 def get_metrics(truth, preds, num_states):
@@ -98,7 +88,9 @@ def print_cm(side_name, correct, total, cm, state_names):
         print(row_str)
 
 
-def run_test(model_dir, manifest_path, episode_idx=None, show_probs=False, test_all=False):
+def run_test(
+    model_dir, manifest_path, episode_idx=None, show_probs=False, test_all=False, print_results=True
+):
     manifest_path = Path(manifest_path)
     with open(manifest_path) as f:
         manifest = yaml.safe_load(f)
@@ -180,19 +172,22 @@ def run_test(model_dir, manifest_path, episode_idx=None, show_probs=False, test_
             results[side]["cm"] += cm
 
     # Print Global Results
-    for side in ["left", "right"]:
-        if results[side]["total"] > 0:
-            print_cm(
-                side,
-                results[side]["correct"],
-                results[side]["total"],
-                results[side]["cm"],
-                results[side]["states"],
-            )
+    if print_results:
+        for side in ["left", "right"]:
+            if results[side]["total"] > 0:
+                print_cm(
+                    side,
+                    results[side]["correct"],
+                    results[side]["total"],
+                    results[side]["cm"],
+                    results[side]["states"],
+                )
 
-    if not test_all:
+    if not test_all and episode_idx is not None:
         # Re-run single episode with full plotting
         test_single_with_plot(model_dir, manifest_path, episode_idx, show_probs)
+
+    return results
 
 
 def test_single_with_plot(model_dir, manifest_path, episode_idx, show_probs):

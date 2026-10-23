@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -90,47 +91,31 @@ def train_side_emissions(side, manifest, manifest_path, boundaries, boundaries2=
         if not file_path.exists():
             continue
 
-        # Load CSV
-        df = pd.read_csv(file_path)
-        df["time"] = pd.to_datetime(df["time"], format="ISO8601")
-        df.sort_values("time", inplace=True)
-
         side_info = episode.get(side)
-        if not side_info or not side_info.get("initial_state"):
+        if not side_info:
             continue
 
-        current_state = side_info["initial_state"]
-        trans_list = side_info.get("transitions", [])
-        transitions = sorted(trans_list, key=lambda x: x["time"])
-        trans_idx = 0
+        current_state = side_info.get("state") or side_info.get("initial_state")
+        if not current_state or current_state not in state_to_idx:
+            continue
+        s_idx = state_to_idx[current_state]
+
+        # Load CSV
+        df = pd.read_csv(file_path)
 
         col_sonar2 = f"{side}_2"
         episode_has_sonar2 = col_sonar2 in df.columns and counts2 is not None
 
-        for _, row in df.iterrows():
-            if trans_idx < len(transitions):
-                t_str = transitions[trans_idx]["time"]
-                trans_time = pd.to_datetime(t_str, format="ISO8601")
-                if row["time"] >= trans_time:
-                    current_state = transitions[trans_idx]["to"]
-                    trans_idx += 1
-
-            if current_state not in state_to_idx:
-                continue
-            s_idx = state_to_idx[current_state]
-
-            dist = row.get(side)
-            if dist is not None and not pd.isna(dist):
-                # Input is meters, bucket logic expects cm
+        if side in df.columns:
+            for dist in df[side].dropna():
                 bucket = get_bucket(dist * 100.0, boundaries)
                 counts[s_idx][bucket] += 1
 
-            if episode_has_sonar2:
-                dist2 = row.get(col_sonar2)
-                if dist2 is not None and not pd.isna(dist2):
-                    bucket2 = get_bucket(dist2 * 100.0, boundaries2)
-                    counts2[s_idx][bucket2] += 1
-                    has_sonar2 = True
+        if episode_has_sonar2:
+            for dist2 in df[col_sonar2].dropna():
+                bucket2 = get_bucket(dist2 * 100.0, boundaries2)
+                counts2[s_idx][bucket2] += 1
+                has_sonar2 = True
 
     # Normalize to probabilities (with Laplace smoothing)
     denom = counts.sum(axis=1, keepdims=True) + 0.1 * num_buckets
@@ -200,7 +185,7 @@ def export_to_cpp(A, B, pi, boundaries, output_path, B2=None, boundaries2=None, 
     print(f"Exported C++ header: {output_path}")
 
 
-if __name__ == "__main__":
+def main():
     desc = "Train separate HMMs for Garage133 sides."
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument(
@@ -249,35 +234,55 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    train_models(
+        manifest_path=args.manifest,
+        output_dir=args.output_dir,
+        boundaries=args.boundaries,
+        num_buckets=args.num_buckets,
+        max_dist=args.max_dist,
+        boundaries2=args.boundaries2,
+        num_buckets2=args.num_buckets2,
+        max_dist2=args.max_dist2,
+        cpp_header=args.cpp_header,
+    )
 
+
+def train_models(
+    manifest_path="manifest.yaml",
+    output_dir=".",
+    boundaries=None,
+    num_buckets=None,
+    max_dist=400,
+    boundaries2=None,
+    num_buckets2=None,
+    max_dist2=400,
+    cpp_header=None,
+):
+    """Trains Left and Right HMM models from manifest data."""
     # Determine boundaries
-    if args.num_buckets:
-        linspace = np.linspace(0, args.max_dist, args.num_buckets, endpoint=False)
+    if num_buckets:
+        linspace = np.linspace(0, max_dist, num_buckets, endpoint=False)
         boundaries = linspace.tolist()[1:]
         boundaries = [int(b) for b in boundaries]
-        print(f"Generated {args.num_buckets} buckets for sonar 1 with boundaries: {boundaries}")
-    elif args.boundaries:
-        boundaries = args.boundaries
-    else:
+        print(f"Generated {num_buckets} buckets for sonar 1 with boundaries: {boundaries}")
+    elif boundaries is None:
         boundaries = DEFAULT_BOUNDARIES
 
     # Determine boundaries2
-    if args.num_buckets2:
-        linspace2 = np.linspace(0, args.max_dist2, args.num_buckets2, endpoint=False)
+    if num_buckets2:
+        linspace2 = np.linspace(0, max_dist2, num_buckets2, endpoint=False)
         boundaries2 = linspace2.tolist()[1:]
         boundaries2 = [int(b) for b in boundaries2]
-        print(f"Generated {args.num_buckets2} buckets for sonar 2 with boundaries: {boundaries2}")
-    elif args.boundaries2:
-        boundaries2 = args.boundaries2
-    else:
+        print(f"Generated {num_buckets2} buckets for sonar 2 with boundaries: {boundaries2}")
+    elif boundaries2 is None:
         boundaries2 = boundaries
 
-    manifest_path = Path(args.manifest)
-    if not manifest_path.exists():
-        print(f"Error: Manifest {manifest_path} not found.")
-        exit(1)
+    manifest_file = Path(manifest_path)
+    if not manifest_file.exists():
+        print(f"Error: Manifest {manifest_file} not found.")
+        sys.exit(1)
 
-    with manifest_path.open("r") as f:
+    with manifest_file.open("r") as f:
         manifest = yaml.safe_load(f)
 
     # Determine the state space from manifest entries
@@ -287,10 +292,8 @@ if __name__ == "__main__":
             side_info = episode.get(side)
             if not side_info:
                 continue
-            states_found = [side_info.get("initial_state")] + [
-                t.get("to") for t in side_info.get("transitions", [])
-            ]
-            if any(s in ["open_car", "open_empty"] for s in states_found if s):
+            st = side_info.get("state") or side_info.get("initial_state")
+            if st in ["open_car", "open_empty"]:
                 has_four_states = True
                 break
         if has_four_states:
@@ -308,23 +311,29 @@ if __name__ == "__main__":
     pi = np.array([0.05, 0.05, 0.5, 0.4]) if len(states) == 4 else np.array([0.1, 0.5, 0.4])
 
     # Ensure output directory exists
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
 
     # Train and save Left
     print("Training left side...")
     B_left, B_left2 = train_side_emissions(
-        "left", manifest, manifest_path, boundaries, boundaries2, states
+        "left", manifest, manifest_file, boundaries, boundaries2, states
     )
-    save_model("left", A, B_left, pi, boundaries, output_dir, B_left2, boundaries2, states)
+    save_model("left", A, B_left, pi, boundaries, output_path, B_left2, boundaries2, states)
 
     # Train and save Right
     print("Training right side...")
     B_right, B_right2 = train_side_emissions(
-        "right", manifest, manifest_path, boundaries, boundaries2, states
+        "right", manifest, manifest_file, boundaries, boundaries2, states
     )
-    save_model("right", A, B_right, pi, boundaries, output_dir, B_right2, boundaries2, states)
+    save_model("right", A, B_right, pi, boundaries, output_path, B_right2, boundaries2, states)
 
     # Optional C++ header
-    if args.cpp_header:
-        export_to_cpp(A, B_left, pi, boundaries, args.cpp_header, B_left2, boundaries2, states)
+    if cpp_header:
+        export_to_cpp(A, B_left, pi, boundaries, cpp_header, B_left2, boundaries2, states)
+
+    return states
+
+
+if __name__ == "__main__":
+    main()

@@ -31,15 +31,13 @@ Training data is managed via a central `manifest.yaml`. This keeps raw CSVs immu
 ### Manifest Structure
 ```yaml
 episodes:
-  - file: "raw/event_001.csv"
+  - file: "garage_2026-06-23_0900.csv"
+    start: "2026-06-23T13:00:16Z"
+    end: "2026-06-23T13:44:36Z"
     left:
-      initial_state: "closed_empty"
-      transitions:
-        - { time: "2026-02-27T10:00:05Z", to: "open" }
-        - { time: "2026-02-27T10:01:00Z", to: "closed_car" }
+      state: "closed_car"
     right:
-      initial_state: "closed_car"
-      transitions: []
+      state: "closed_car"
 ```
 
 ## 5. Workflow

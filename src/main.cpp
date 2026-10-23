@@ -25,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "1.0.5"
+#define VERSION "2.1.0"
 
 namespace og3 {
 
@@ -35,25 +35,22 @@ static const char kSoftware[] = "Garage133 v" VERSION;
 
 // --- Garage133 Hardware Configuration ---
 
-// Relays (Door Control)
-const int kRelayLeftPin = 4;
-const int kRelayRightPin = 19;
+// ESP32-S3 Pin Assignments
+const int kRelayLeftPin = 10;   // RELAY_CMD1
+const int kRelayRightPin = 11;  // RELAY_CMD2
 
-// Sonar Sensors
-const int kLeftTrigPin = 16;
-const int kLeftEchoPin = 17;
-const int kRightTrigPin = 5;
-const int kRightEchoPin = 18;
+const int kLeftTrigPin = 1;     // TRIG1
+const int kLeftEchoPin = 5;     // ECHO1
+const int kRightTrigPin = 2;    // TRIG2
+const int kRightEchoPin = 6;    // ECHO2
 
-// Sonar Sensors (Rear - Sonar 2)
-const int kLeftTrig2Pin = 23;
-const int kLeftEcho2Pin = 26;
-const int kRightTrig2Pin = 27;
-const int kRightEcho2Pin = 32;
+const int kLeftTrig2Pin = 3;    // TRIG3
+const int kLeftEcho2Pin = 7;    // ECHO3
+const int kRightTrig2Pin = 4;   // TRIG4
+const int kRightEcho2Pin = 15;  // ECHO4
 
-// PIR & Light Sensors
-const int kPirPin = 25;
-const int kLightPin = 33;
+const int kPirPin = 12;         // AL
+const int kLightPin = 12;       // AL
 
 #if defined(LOG_UDP) && defined(LOG_UDP_ADDRESS)
 constexpr App::LogType kLogType = App::LogType::kUdp;
@@ -411,11 +408,11 @@ void update() {
   s_left_sonar_2.setTemp(s_shtc3.temperature());
 
   s_left_sonar.read();
-  delay(4);  // Wait a short (2msec) time between sonar readings.
+  delay(2);  // Wait a short (2msec) time between sonar readings.
   s_right_sonar.read();
-  delay(4);
+  delay(2);
   s_left_sonar_2.read();
-  delay(4);
+  delay(2);
   s_right_sonar_2.read();
 
   char text[256];
