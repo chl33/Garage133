@@ -6,6 +6,7 @@ repos:
     exclude: |
         (?x)^(
             .*/.pio/.*|
+            .*svelteesp32async\.h$|
             .*\.proto|
             .*\.json|
             .*\.js
