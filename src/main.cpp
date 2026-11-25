@@ -25,7 +25,7 @@
 #include "hmm.h"
 #include "svelteesp32async.h"
 
-#define VERSION "2.1.1"
+#define VERSION "2.1.2"
 
 namespace og3 {
 
